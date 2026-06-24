@@ -1,94 +1,64 @@
-# VoiSe Development Starter
+# VoiSe Development Starter — Gate 2
 
-Стартовый пакет для перехода от ТЗ VoiSe v0.3 к разработке.
+Стартовый пакет разработки VoiSe после успешных Gate 0 и Gate 1.
 
-Первый этап — **Gate 0 Audio Prototype**: проверить тракт:
+Gate 2 проверяет более правильную архитектуру аудиодвижка:
 
 ```text
-Physical microphone -> VoiSe processing -> VB-CABLE Input -> VB-CABLE Output -> Discord/Telegram
+Physical microphone
+-> voice processing
+-> unified route mixer
+-> VB-CABLE Input
+-> CABLE Output as microphone in Discord/Telegram
+
+SoundBoard
+-> headphones immediately
+-> virtual microphone with configurable delay
 ```
 
 ## Требования
 
 - Windows 10 x64 22H2 или Windows 11 x64
 - .NET SDK 8 или новее
-- Visual Studio 2022 с Windows App SDK workload — для будущего WinUI 3 UI
 - Установленный VB-CABLE
+- Visual Studio 2022 с Windows App SDK workload — для будущего WinUI 3 UI
 
-## Быстрый старт Gate 0
-
-1. Установить VB-CABLE.
-2. Открыть PowerShell в корне проекта.
-3. Выполнить:
+## Быстрый старт
 
 ```powershell
 ./scripts/bootstrap.ps1
 ```
 
-4. Посмотреть аудиоустройства:
+Посмотреть аудиоустройства:
 
 ```powershell
 dotnet run --project src/VoiSe.Gate0.Cli -- --list-devices
 ```
 
-5. Запустить passthrough в VB-CABLE:
+Запустить Gate 2:
 
 ```powershell
-dotnet run --project src/VoiSe.Gate0.Cli -- --input "Ваш микрофон" --virtual-output "CABLE Input" --monitor "Ваши наушники"
+dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\song.wav" --sound-virtual-delay-ms 85
 ```
 
 В Discord/Telegram нужно выбрать входной микрофон **CABLE Output**.
 
-## Структура
+## Runtime keys
 
-```text
-src/VoiSe.Audio       аудиоядро Gate 0
-src/VoiSe.Gate0.Cli   консольный прототип для проверки тракта
-src/VoiSe.App         заготовка WinUI 3 приложения
-scripts               команды bootstrap/build
-scripts/bootstrap.ps1 создание sln и восстановление пакетов
-docs                  решения и тест-планы
-```
+- `S` — проиграть soundboard-файл через единый микшер
+- `X` — остановить soundboard-файл
+- `Ctrl+C` — выйти
 
-## Что важно
+## Главное изменение Gate 2
 
-Это не финальное приложение, а стартовый код для снятия главного риска: маршрутизация и задержка audio pipeline через VB-CABLE.
+В Gate 1 звук soundboard и голос шли отдельными WASAPI-потоками.
+В Gate 2 они смешиваются внутри VoiSe route mixer, и limiter применяется после суммы голоса и звука.
 
+Это ближе к будущему MVP с WinUI 3, сценами, громкостями и настройками.
 
-## Gate 1: one-shot SoundBoard test
+## Документация
 
-After Gate 0 succeeds, test a sound file mixed into the virtual microphone route:
-
-```powershell
-dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\sound.wav"
-```
-
-Runtime keys:
-
-- `S` — play the sound
-- `X` — stop the sound
-- `Ctrl+C` — exit
-
-For OGG/Vorbis, the prototype uses `NAudio.Vorbis`.
-
-
-## Gate 1.1: SoundBoard monitor delay
-
-If the soundboard is heard in headphones earlier than it reaches friends through the virtual microphone, add a small headphone-only delay:
-
-```powershell
-dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\sound.wav" --sound-virtual-delay-ms 80
-```
-
-Try 40, 80, 120, 160 ms and keep the value that makes singing align best for listeners.
-
-
-## Gate 1.3 soundboard delay
-
-Use `--sound-virtual-delay-ms` when you need to hear the soundboard in headphones first and send the same sound to the virtual microphone later. This is useful when singing along: you hear the song cue first, then your friends hear the song and your voice closer to the same moment.
-
-Example:
-
-```powershell
-dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\song.wav" --sound-virtual-delay-ms 120
-```
+- `docs/GATE2_UNIFIED_MIXER.md` — тест-план Gate 2
+- `docs/ADR-001-tech-stack.md` — стек MVP
+- `docs/ADR-002-audio-contract.md` — аудиоконтракт
+- `docs/ROADMAP.md` — следующие этапы

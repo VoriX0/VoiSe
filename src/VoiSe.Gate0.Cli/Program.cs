@@ -63,7 +63,7 @@ var settings = new EffectSettings
     LimiterCeilingDb = options.LimiterCeilingDb
 };
 
-Console.WriteLine("VoiSe Gate 0 Audio Prototype");
+Console.WriteLine("VoiSe Gate 2 Unified Mixer Prototype");
 Console.WriteLine($"Input:          {input.FriendlyName}");
 Console.WriteLine($"Virtual output: {virtualOutput.FriendlyName}");
 Console.WriteLine($"Monitor:        {(monitor is null ? "disabled" : monitor.FriendlyName)}");
@@ -80,15 +80,7 @@ if (!string.IsNullOrWhiteSpace(options.SoundFile))
     }
 }
 
-using var engine = new Gate0AudioEngine(input, virtualOutput, monitor, settings);
-using var soundPlayer = string.IsNullOrWhiteSpace(options.SoundFile)
-    ? null
-    : new OneShotSoundPlayer(
-        virtualOutput,
-        monitor,
-        options.SoundVirtualVolume,
-        options.SoundMonitorVolume,
-        options.SoundVirtualDelayMs);
+using var engine = new Gate2UnifiedAudioEngine(input, virtualOutput, monitor, settings);
 using var done = new ManualResetEventSlim(false);
 
 Console.CancelKeyPress += (_, eventArgs) =>
@@ -100,9 +92,9 @@ Console.CancelKeyPress += (_, eventArgs) =>
 try
 {
     engine.Start();
-    if (soundPlayer is not null)
+    if (!string.IsNullOrWhiteSpace(options.SoundFile))
     {
-        StartKeyboardLoop(soundPlayer, options.SoundFile!, done);
+        StartKeyboardLoop(engine, options, done);
     }
 
     if (options.DurationSeconds > 0)
@@ -176,7 +168,7 @@ static void PrintHelp()
 }
 
 
-static void StartKeyboardLoop(OneShotSoundPlayer soundPlayer, string soundFile, ManualResetEventSlim done)
+static void StartKeyboardLoop(Gate2UnifiedAudioEngine engine, CommandLineOptions options, ManualResetEventSlim done)
 {
     var thread = new Thread(() =>
     {
@@ -193,8 +185,12 @@ static void StartKeyboardLoop(OneShotSoundPlayer soundPlayer, string soundFile, 
             {
                 try
                 {
-                    soundPlayer.Play(soundFile);
-                    Console.WriteLine($"Played sound: {soundFile}");
+                    engine.PlaySound(
+                        options.SoundFile!,
+                        options.SoundVirtualVolume,
+                        options.SoundMonitorVolume,
+                        options.SoundVirtualDelayMs);
+                    Console.WriteLine($"Played sound through unified mixer: {options.SoundFile}");
                 }
                 catch (Exception ex)
                 {
@@ -203,14 +199,14 @@ static void StartKeyboardLoop(OneShotSoundPlayer soundPlayer, string soundFile, 
             }
             else if (key == ConsoleKey.X)
             {
-                soundPlayer.Stop();
+                engine.StopSound();
                 Console.WriteLine("Sound stopped.");
             }
         }
     })
     {
         IsBackground = true,
-        Name = "VoiSe Gate1 keyboard loop"
+        Name = "VoiSe Gate2 keyboard loop"
     };
 
     thread.Start();

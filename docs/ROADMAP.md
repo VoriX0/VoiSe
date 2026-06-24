@@ -1,38 +1,19 @@
-# Roadmap
+# VoiSe Roadmap
 
-## Gate 0 — Audio Prototype
+## Done
 
-- device listing
-- mic -> VB-CABLE passthrough
-- monitoring
-- simple gate/compressor/limiter
-- latency check
+- Gate 0: mic -> VoiSe -> VB-CABLE -> monitoring works on Windows.
+- Gate 1: one-shot SoundBoard reaches virtual microphone and headphones.
+- Gate 1.3: SoundBoard virtual microphone delay works; user comfort value is 85 ms.
 
-## Gate 1 — Data Model
+## Current
 
-- JSON config
-- sound/category/scene/preset models
-- schemaVersion
+- Gate 2: unified route mixer for microphone + SoundBoard.
 
-## Gate 2 — WinUI 3 shell
+## Next
 
-- tabs: Voice Changer, Scenes, SoundBoard, Settings
-- device status
-- basic settings screen
-
-## Gate 3 — MVP features
-
-- SoundBoard list/categories
-- scenes
-- three presets
-- hotkeys
-- tray mode
-
-
-## Gate 1 completed in this package
-
-- Add one-shot sound playback into virtual output and monitoring output.
-- Add OGG/Vorbis decoding dependency through NAudio.Vorbis.
-- Add runtime keys: S to play, X to stop.
-
-Next: internal mix bus, volume separation, Stop all, and first WinUI 3 shell.
+- Gate 2.1: add background loop slot.
+- Gate 2.2: add simple JSON config for devices and delay.
+- Gate 3: minimal WinUI 3 shell with Settings + SoundBoard test button.
+- Gate 4: Scenes model and UI.
+- Gate 5: Voice Changer presets and effect sliders.
