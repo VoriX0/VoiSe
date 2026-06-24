@@ -11,6 +11,7 @@ public sealed class OneShotSoundPlayer : IDisposable
     private readonly MMDevice? _monitorDevice;
     private readonly float _virtualVolume;
     private readonly float _monitorVolume;
+    private readonly int _monitorStartDelayMs;
 
     private readonly object _sync = new();
     private ActivePlayback? _virtualPlayback;
@@ -21,12 +22,14 @@ public sealed class OneShotSoundPlayer : IDisposable
         MMDevice virtualOutputDevice,
         MMDevice? monitorDevice,
         float virtualVolume = 1.0f,
-        float monitorVolume = 1.0f)
+        float monitorVolume = 1.0f,
+        int monitorStartDelayMs = 0)
     {
         _virtualOutputDevice = virtualOutputDevice;
         _monitorDevice = monitorDevice;
         _virtualVolume = Math.Clamp(virtualVolume, 0.0f, 2.0f);
         _monitorVolume = Math.Clamp(monitorVolume, 0.0f, 2.0f);
+        _monitorStartDelayMs = Math.Clamp(monitorStartDelayMs, 0, 1000);
     }
 
     public void Play(string filePath)
@@ -39,11 +42,11 @@ public sealed class OneShotSoundPlayer : IDisposable
         lock (_sync)
         {
             StopLocked();
-            _virtualPlayback = StartPlayback(_virtualOutputDevice, filePath, _virtualVolume);
+            _virtualPlayback = StartPlayback(_virtualOutputDevice, filePath, _virtualVolume, startDelayMs: 0);
 
             if (_monitorDevice is not null)
             {
-                _monitorPlayback = StartPlayback(_monitorDevice, filePath, _monitorVolume);
+                _monitorPlayback = StartPlayback(_monitorDevice, filePath, _monitorVolume, _monitorStartDelayMs);
             }
         }
     }
@@ -56,7 +59,7 @@ public sealed class OneShotSoundPlayer : IDisposable
         }
     }
 
-    private static ActivePlayback StartPlayback(MMDevice outputDevice, string filePath, float volume)
+    private static ActivePlayback StartPlayback(MMDevice outputDevice, string filePath, float volume, int startDelayMs)
     {
         var reader = CreateReader(filePath);
         var sampleProvider = reader.ToSampleProvider();
@@ -73,6 +76,11 @@ public sealed class OneShotSoundPlayer : IDisposable
             output.Dispose();
             reader.Dispose();
         };
+        if (startDelayMs > 0)
+        {
+            Thread.Sleep(startDelayMs);
+        }
+
         output.Play();
 
         return new ActivePlayback(output, reader);

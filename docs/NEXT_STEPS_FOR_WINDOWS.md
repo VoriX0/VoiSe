@@ -33,3 +33,8 @@ dotnet run --project src/VoiSe.Gate0.Cli -- --input "Microphone" --virtual-outpu
 - crackling/dropouts:
 - CPU usage:
 - notes:
+
+
+## Gate 1.1 / 1.2: SoundBoard monitor delay
+
+Use `--sound-monitor-delay-ms <ms>` to delay soundboard playback in headphones only. The sound still goes to the virtual microphone immediately. This is intended for cases where the user sings or speaks along with the sound and needs the monitoring to line up with what listeners hear through the virtual microphone. Suggested values: 40, 80, 120, 160 ms.

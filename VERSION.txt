@@ -1,0 +1,4 @@
+VoiSe Gate 1.2
+- Fix: --sound-monitor-delay-ms is registered in CommandLineOptions.
+- Fix: invalid CLI arguments now produce a friendly error instead of an unhandled exception.
+- Docs: added SoundBoard monitor delay explanation.

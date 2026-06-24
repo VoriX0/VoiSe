@@ -70,3 +70,14 @@ Runtime keys:
 - `Ctrl+C` — exit
 
 For OGG/Vorbis, the prototype uses `NAudio.Vorbis`.
+
+
+## Gate 1.1: SoundBoard monitor delay
+
+If the soundboard is heard in headphones earlier than it reaches friends through the virtual microphone, add a small headphone-only delay:
+
+```powershell
+dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\sound.wav" --sound-monitor-delay-ms 80
+```
+
+Try 40, 80, 120, 160 ms and keep the value that makes singing align best for listeners.

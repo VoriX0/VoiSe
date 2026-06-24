@@ -1,6 +1,16 @@
 using VoiSe.Audio;
 
-var options = CommandLineOptions.Parse(args);
+CommandLineOptions options;
+try
+{
+    options = CommandLineOptions.Parse(args);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine($"Command line error: {ex.Message}");
+    Console.Error.WriteLine("Use --help to inspect supported options.");
+    return 1;
+}
 
 if (options.ShowHelp)
 {
@@ -63,12 +73,21 @@ if (!string.IsNullOrWhiteSpace(options.SoundFile))
 {
     Console.WriteLine($"Sound file:     {options.SoundFile}");
     Console.WriteLine("Runtime keys:   S = play sound, X = stop sound");
+    if (options.SoundMonitorDelayMs > 0)
+    {
+        Console.WriteLine($"Monitor delay:  {options.SoundMonitorDelayMs} ms for soundboard playback");
+    }
 }
 
 using var engine = new Gate0AudioEngine(input, virtualOutput, monitor, settings);
 using var soundPlayer = string.IsNullOrWhiteSpace(options.SoundFile)
     ? null
-    : new OneShotSoundPlayer(virtualOutput, monitor, options.SoundVirtualVolume, options.SoundMonitorVolume);
+    : new OneShotSoundPlayer(
+        virtualOutput,
+        monitor,
+        options.SoundVirtualVolume,
+        options.SoundMonitorVolume,
+        options.SoundMonitorDelayMs);
 using var done = new ManualResetEventSlim(false);
 
 Console.CancelKeyPress += (_, eventArgs) =>
@@ -141,6 +160,7 @@ static void PrintHelp()
     Console.WriteLine("  --sound-file <path>                 optional WAV/MP3/OGG one-shot file");
     Console.WriteLine("  --sound-virtual-volume <value>      default: 1.0");
     Console.WriteLine("  --sound-monitor-volume <value>      default: 1.0");
+    Console.WriteLine("  --sound-monitor-delay-ms <ms>       default: 0, delay soundboard in headphones only");
     Console.WriteLine("  --input-gain-db <value>             default: 0");
     Console.WriteLine("  --voice-gain-db <value>             default: 0");
     Console.WriteLine("  --gate-threshold-db <value>         default: -45");

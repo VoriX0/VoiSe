@@ -27,3 +27,20 @@ Supported test formats:
 ## Notes
 
 This is still a prototype. The soundboard sound is played through additional shared-mode WASAPI outputs to the same VB-CABLE and monitoring devices. The final MVP mixer should move this into a single internal mix bus with one limiter.
+
+
+## Gate 1.1: soundboard monitor sync
+
+If the soundboard reaches friends through the virtual microphone later than you hear it in headphones, your singing or voice can arrive earlier than the song moment.
+
+Use `--sound-monitor-delay-ms` to delay only the soundboard playback in headphones. The soundboard signal sent to `CABLE Input` is not delayed.
+
+Start with 80 ms and tune by ear:
+
+```powershell
+dotnet run --project src/VoiSe.Gate0.Cli -- --input "Микрофон (Fifine Microphone)" --virtual-output "CABLE Input" --monitor "Наушники (Realtek(R) Audio)" --sound-file "C:\Path\To\song.wav" --sound-monitor-delay-ms 80
+```
+
+Suggested values to try: 40, 80, 120, 160 ms.
+
+This is a temporary Gate 1 sync control. The final app should expose it as a SoundBoard monitoring delay slider.
