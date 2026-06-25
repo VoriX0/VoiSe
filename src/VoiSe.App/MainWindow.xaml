@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.7 - SoundBoard XAML Build Fix">
+    Title="VoiSe Gate 5.9 - SoundBoard Timeline &amp; Scroll Fix">
 
 
     <Grid Padding="20" RowSpacing="14">
@@ -21,8 +21,8 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                <TextBlock Text="VoiSe Gate 5.7" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="SoundBoard polish: fixed XAML build, scrolling and timeline" Opacity="0.75" />
+                <TextBlock Text="VoiSe Gate 5.9" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="SoundBoard polish: timeline and scroll fixes" Opacity="0.75" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -71,7 +71,17 @@
 
                         <TextBlock Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="TransportStatusTextBlock" Text="No sound" HorizontalAlignment="Center" Opacity="0.75" />
                         <Button Grid.Row="1" Grid.Column="1" x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="22" MinWidth="0" Width="56" Height="48" HorizontalAlignment="Left" VerticalAlignment="Center" Click="OnPlayPauseSoundClick" ToolTipService.ToolTip="Play / Pause" />
-                        <Slider Grid.Row="1" Grid.Column="2" x:Name="TimelineSlider" Minimum="0" Maximum="1" Value="0" IsEnabled="False" PointerPressed="OnTimelinePointerPressed" PointerReleased="OnTimelinePointerReleased" ValueChanged="OnTimelineValueChanged" />
+                        <Grid Grid.Row="1" Grid.Column="2" x:Name="TimelineHost" Height="48" VerticalAlignment="Center" Background="#01000000" PointerPressed="OnTimelineHostPointerPressed" PointerMoved="OnTimelineHostPointerMoved" PointerReleased="OnTimelineHostPointerReleased" PointerCanceled="OnTimelineHostPointerReleased" SizeChanged="OnTimelineHostSizeChanged">
+                            <Grid Height="8" VerticalAlignment="Center">
+                                <Border Background="#33FFFFFF" CornerRadius="4" />
+                                <Border x:Name="TimelineFill" Width="0" HorizontalAlignment="Left" Background="#99FFFFFF" CornerRadius="4" />
+                            </Grid>
+                            <Ellipse x:Name="TimelineThumb" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center" Fill="#FFFFFFFF">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform x:Name="TimelineThumbTransform" X="0" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Grid>
                         <Grid Grid.Row="2" Grid.Column="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -118,7 +128,7 @@
                             <Button Content="Delete Track" Click="OnDeleteSoundClick" />
                         </StackPanel>
 
-                        <ListView Grid.Row="3" x:Name="SoundListView" Background="Transparent" MinHeight="260" DisplayMemberPath="ListText" SelectionChanged="OnSoundSelectionChanged" RightTapped="OnSoundListRightTapped" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Enabled" ScrollViewer.IsVerticalRailEnabled="True">
+                        <ListView Grid.Row="3" x:Name="SoundListView" Background="#01000000" MinHeight="260" DisplayMemberPath="ListText" SelectionChanged="OnSoundSelectionChanged" RightTapped="OnSoundListRightTapped" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Enabled" ScrollViewer.IsVerticalRailEnabled="True" IsTabStop="True">
                             <ListView.ContextFlyout>
                                 <MenuFlyout>
                                     <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
@@ -207,7 +217,7 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <TextBox Grid.Row="1" x:Name="LogTextBox" Header="Log" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch" />
+                    <TextBox Grid.Row="1" x:Name="LogTextBox" Header="Log" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.VerticalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
                 </Grid>
             </TabViewItem>
         </TabView>

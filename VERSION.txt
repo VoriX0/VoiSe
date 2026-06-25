@@ -1,1 +1,1 @@
-Gate 5.7 - SoundBoard XAML Build Fix
+Gate 5.9 - SoundBoard Timeline & Scroll Fix

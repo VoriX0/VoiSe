@@ -35,6 +35,7 @@ public sealed partial class MainWindow : Window
     private bool _loadedOnce;
     private bool _timelineUserDragging;
     private bool _updatingTimeline;
+    private double _timelineMaximumSeconds = 1.0;
 
     public MainWindow()
     {
@@ -60,7 +61,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.6 UI started.");
+        AppendLog("Gate 5.9 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -82,20 +83,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.6 restore started.");
+            StartupLog.Write("Gate 5.9 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.6 scalar settings applied.");
+            StartupLog.Write("Gate 5.9 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.6 restore completed.");
+            StartupLog.Write("Gate 5.9 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.6 restore error: " + ex);
+            StartupLog.Write("Gate 5.9 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -825,87 +826,99 @@ public sealed partial class MainWindow : Window
         ApplyLiveSettings(_voiceMonitorEnabled ? "voice monitor enabled" : "voice monitor disabled");
     }
 
-    private void OnTimelinePointerPressed(object sender, PointerRoutedEventArgs e)
+    private void OnTimelineHostPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (TimelineSlider.IsEnabled)
+        var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
+        if (!status.IsActive)
         {
-            _timelineUserDragging = true;
+            return;
         }
+
+        _timelineUserDragging = true;
+        TimelineHost.CapturePointer(e.Pointer);
+        SeekSoundToPointer(e);
     }
 
-    private void OnTimelinePointerReleased(object sender, PointerRoutedEventArgs e)
+    private void OnTimelineHostPointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (!_timelineUserDragging)
         {
             return;
         }
 
+        SeekSoundToPointer(e);
+    }
+
+    private void OnTimelineHostPointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_timelineUserDragging)
+        {
+            return;
+        }
+
+        SeekSoundToPointer(e);
         _timelineUserDragging = false;
-        SeekSoundToTimeline();
-    }
-
-    private void OnTimelineValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-        if (_updatingTimeline)
-        {
-            return;
-        }
-
-        if (TimelineSlider.IsEnabled && _engine is not null)
-        {
-            var seconds = Math.Max(0, Math.Min(TimelineSlider.Maximum, e.NewValue));
-            _timelineUserDragging = true;
-            _engine.SeekSound(seconds);
-            CurrentTimeTextBlock.Text = FormatTime(seconds);
-        }
-    }
-
-    private void SeekSoundToTimeline()
-    {
-        if (_engine is null)
-        {
-            return;
-        }
-
-        var seconds = Math.Max(0, Math.Min(TimelineSlider.Maximum, TimelineSlider.Value));
-        _engine.SeekSound(seconds);
+        TimelineHost.ReleasePointerCapture(e.Pointer);
         UpdateTimeline();
-        AppendLog($"Sound seeked to {FormatTime(seconds)}.");
+    }
+
+    private void OnTimelineHostSizeChanged(object sender, SizeChangedEventArgs e) => UpdateTimeline();
+
+    private void SeekSoundToPointer(PointerRoutedEventArgs e)
+    {
+        if (_engine is null || TimelineHost.ActualWidth <= 1)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(TimelineHost).Position;
+        var ratio = Math.Max(0, Math.Min(1, point.X / TimelineHost.ActualWidth));
+        var seconds = ratio * _timelineMaximumSeconds;
+        _engine.SeekSound(seconds);
+        SetTimelineVisual(seconds, _timelineMaximumSeconds);
+        CurrentTimeTextBlock.Text = FormatTime(seconds);
     }
 
     private void OnTimelineTimerTick(object? sender, object e) => UpdateTimeline();
 
     private void UpdateTimeline()
     {
-        if (TimelineSlider is null)
+        if (TimelineHost is null)
         {
             return;
         }
 
         var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
         var max = Math.Max(1, status.DurationSeconds);
+        _timelineMaximumSeconds = max;
 
-        _updatingTimeline = true;
-        try
+        if (!_timelineUserDragging)
         {
-            TimelineSlider.Maximum = max;
-            TimelineSlider.IsEnabled = status.IsActive;
-            if (!_timelineUserDragging)
-            {
-                TimelineSlider.Value = Math.Min(max, Math.Max(0, status.CurrentSeconds));
-            }
-        }
-        finally
-        {
-            _updatingTimeline = false;
+            SetTimelineVisual(status.CurrentSeconds, max);
+            CurrentTimeTextBlock.Text = FormatTime(status.CurrentSeconds);
         }
 
-        CurrentTimeTextBlock.Text = FormatTime(_timelineUserDragging ? TimelineSlider.Value : status.CurrentSeconds);
         TotalTimeTextBlock.Text = FormatTime(status.DurationSeconds);
         TransportStatusTextBlock.Text = status.IsActive
             ? (status.IsPaused ? "Paused" : "Playing")
             : "No sound";
         PlayPauseButton.Content = status.IsActive && !status.IsPaused ? "\uE769" : "\uE768";
+        TimelineHost.Opacity = status.IsActive ? 1.0 : 0.45;
+    }
+
+    private void SetTimelineVisual(double currentSeconds, double durationSeconds)
+    {
+        if (TimelineHost is null || TimelineFill is null || TimelineThumbTransform is null)
+        {
+            return;
+        }
+
+        var width = Math.Max(0, TimelineHost.ActualWidth);
+        var duration = Math.Max(1, durationSeconds);
+        var ratio = Math.Max(0, Math.Min(1, currentSeconds / duration));
+        var fillWidth = width * ratio;
+        TimelineFill.Width = fillWidth;
+        TimelineThumbTransform.X = Math.Max(0, Math.Min(width - 16, fillWidth - 8));
     }
 
     private static string FormatTime(double seconds)

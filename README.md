@@ -1,10 +1,10 @@
-# VoiSe Gate 5.7 — SoundBoard XAML Build Fix
+# VoiSe Gate 5.9 — SoundBoard Timeline & Scroll Fix
 
-Gate 5.7 продолжает доведение вкладки SoundBoard до целевого UX после проверки Gate 5.3.
+Gate 5.9 продолжает доведение вкладки SoundBoard до целевого UX после проверки Gate 5.3.
 
 ## Что изменено после Gate 5.3
 
-- заголовок окна: `VoiSe Gate 5.7 - SoundBoard XAML Build Fix`;
+- заголовок окна: `VoiSe Gate 5.9 - SoundBoard Timeline & Scroll Fix`;
 - блок `Start Engine / Stop Engine` перенесён в общий header окна справа от заголовка VoiSe и виден на всех вкладках;
 - общий нижний блок удалён;
 - лог приложения теперь находится только во вкладке `Settings`;
@@ -25,7 +25,7 @@ dotnet run --project src/VoiSe.App
 
 ## Проверка
 
-1. В заголовке окна должно быть `VoiSe Gate 5.7`.
+1. В заголовке окна должно быть `VoiSe Gate 5.9`.
 2. `Start Engine / Stop Engine` должны быть справа в верхней части окна и оставаться видимыми на всех вкладках.
 3. На SoundBoard кнопка Play/Pause должна быть рядом с транспортным блоком, без большого пустого промежутка.
 4. `Previous / Next / Stop` должны образовывать компактный прямоугольный блок.
@@ -36,7 +36,7 @@ dotnet run --project src/VoiSe.App
 9. На вкладках `Voice Changer` и `Scenes` снизу не должно быть статистики SoundBoard.
 
 
-## Gate 5.7 changes
+## Gate 5.9 changes
 
 - Removed the border around Start/Stop Engine controls.
 - Moved Play/Pause closer to the transport block.
