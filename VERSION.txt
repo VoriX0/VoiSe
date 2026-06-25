@@ -1,1 +1,1 @@
-Gate 5.4 - SoundBoard Polish
+Gate 5.5 - SoundBoard Scroll & Timeline Fixes

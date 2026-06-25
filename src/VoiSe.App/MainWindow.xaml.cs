@@ -60,7 +60,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.4 UI started.");
+        AppendLog("Gate 5.5 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -82,20 +82,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.4 restore started.");
+            StartupLog.Write("Gate 5.5 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.4 scalar settings applied.");
+            StartupLog.Write("Gate 5.5 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.4 restore completed.");
+            StartupLog.Write("Gate 5.5 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.4 restore error: " + ex);
+            StartupLog.Write("Gate 5.5 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -132,12 +132,12 @@ public sealed partial class MainWindow : Window
 
     private void OnMainTabSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Gate 5.4: bottom stats panel was removed. Settings tab owns the log panel now.
+        // Gate 5.5: bottom stats panel was removed. Settings tab owns the log panel now.
     }
 
     private void UpdateBottomPanelVisibility()
     {
-        // Gate 5.4: no shared bottom panel. Kept as a no-op for older call sites.
+        // Gate 5.5: no shared bottom panel. Kept as a no-op for older call sites.
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -854,6 +854,7 @@ public sealed partial class MainWindow : Window
         if (TimelineSlider.IsEnabled && _engine is not null)
         {
             var seconds = Math.Max(0, Math.Min(TimelineSlider.Maximum, e.NewValue));
+            _timelineUserDragging = true;
             _engine.SeekSound(seconds);
             CurrentTimeTextBlock.Text = FormatTime(seconds);
         }
@@ -961,7 +962,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateBottomStats()
     {
-        // Gate 5.4: category/sound stats footer was removed from the UI.
+        // Gate 5.5: category/sound stats footer was removed from the UI.
     }
 
     private void SaveCurrentSettings()
@@ -1000,5 +1001,7 @@ public sealed partial class MainWindow : Window
         LogTextBox.Text = string.IsNullOrEmpty(LogTextBox.Text)
             ? line
             : LogTextBox.Text + Environment.NewLine + line;
+        LogTextBox.SelectionStart = LogTextBox.Text.Length;
+        LogTextBox.SelectionLength = 0;
     }
 }
