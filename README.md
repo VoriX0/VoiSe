@@ -1,6 +1,6 @@
-# VoiSe Gate 4 — Persistent Settings Prototype
+# VoiSe Gate 4.1 — Persistent Settings Prototype
 
-Gate 4 adds persistent user settings on top of the working Gate 3.6 WinUI 3 control panel.
+Gate 4.1 adds persistent user settings on top of the working Gate 3.6 WinUI 3 control panel.
 
 ## What is new
 
@@ -46,4 +46,9 @@ dotnet run --project src/VoiSe.App
 
 ## Notes
 
-Gate 4 intentionally keeps the same simple visual layout. The goal is persistence and state stability, not final visual design.
+Gate 4.1 intentionally keeps the same simple visual layout. The goal is persistence and state stability, not final visual design.
+
+
+## Gate 4.1 fix
+
+Settings restore now runs in a protected startup phase: scalar controls are restored, device lists are loaded, saved devices are selected by ID/exact name/friendly-name fallback, and autosave is enabled only after restore is complete. This prevents startup defaults from overwriting saved settings.

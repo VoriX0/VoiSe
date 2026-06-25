@@ -38,47 +38,48 @@ public sealed partial class MainWindow : Window
         };
         _routeRestartTimer.Tick += OnRouteRestartTimerTick;
 
-        ApplyStoredSettingsToControls();
-        UpdateAllLabels();
-        AppendLog("Gate 4 UI started.");
+        AppendLog("Gate 4.1 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
-        StartupLog.Write("MainWindow initialized; loading devices next.");
+        StartupLog.Write("MainWindow initialized; restoring settings next.");
 
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            try
-            {
-                RefreshDevices();
-            }
-            catch (Exception ex)
-            {
-                StartupLog.Write("RefreshDevices startup error: " + ex);
-                AppendLog($"Device refresh error: {ex.Message}");
-            }
-        });
+        DispatcherQueue.TryEnqueue(RestoreSettingsAndDevices);
     }
 
-    private void ApplyStoredSettingsToControls()
+    private void RestoreSettingsAndDevices()
     {
         _loadingSettings = true;
         try
         {
-            _soundFilePath = string.IsNullOrWhiteSpace(_settings.LastSoundFilePath) ? null : _settings.LastSoundFilePath;
-            SoundFileTextBox.Text = _soundFilePath ?? string.Empty;
-
-            VirtualOutputVolumeSlider.Value = Clamp(_settings.VirtualMicMasterVolume, 0, 1.5);
-            SoundVirtualVolumeSlider.Value = Clamp(_settings.SoundBoardVirtualMicVolume, 0, 1.5);
-            SoundMonitorVolumeSlider.Value = Clamp(_settings.SoundBoardHeadphonesVolume, 0, 1.5);
-            SoundVirtualDelaySlider.Value = Clamp(_settings.SoundBoardVirtualMicDelayMs, 0, 300);
-            VoiceGainSlider.Value = Clamp(_settings.VoiceGainDb, -24, 12);
-            GateThresholdSlider.Value = Clamp(_settings.GateThresholdDb, -70, -20);
-            CompressorThresholdSlider.Value = Clamp(_settings.CompressorThresholdDb, -40, 0);
-            _voiceMonitorEnabled = _settings.VoiceMonitorEnabled;
+            AppendLog("Restoring saved settings...");
+            ApplyStoredScalarSettingsToControls();
+            RefreshDevices(saveAfterRefresh: false);
+            UpdateAllLabels();
+            AppendLog("Settings restored.");
+        }
+        catch (Exception ex)
+        {
+            StartupLog.Write("Settings restore error: " + ex);
+            AppendLog($"Settings restore error: {ex.Message}");
         }
         finally
         {
             _loadingSettings = false;
         }
+    }
+
+    private void ApplyStoredScalarSettingsToControls()
+    {
+        _soundFilePath = string.IsNullOrWhiteSpace(_settings.LastSoundFilePath) ? null : _settings.LastSoundFilePath;
+        SoundFileTextBox.Text = _soundFilePath ?? string.Empty;
+
+        VirtualOutputVolumeSlider.Value = Clamp(_settings.VirtualMicMasterVolume, 0, 1.5);
+        SoundVirtualVolumeSlider.Value = Clamp(_settings.SoundBoardVirtualMicVolume, 0, 1.5);
+        SoundMonitorVolumeSlider.Value = Clamp(_settings.SoundBoardHeadphonesVolume, 0, 1.5);
+        SoundVirtualDelaySlider.Value = Clamp(_settings.SoundBoardVirtualMicDelayMs, 0, 300);
+        VoiceGainSlider.Value = Clamp(_settings.VoiceGainDb, -24, 12);
+        GateThresholdSlider.Value = Clamp(_settings.GateThresholdDb, -70, -20);
+        CompressorThresholdSlider.Value = Clamp(_settings.CompressorThresholdDb, -40, 0);
+        _voiceMonitorEnabled = _settings.VoiceMonitorEnabled;
     }
 
     private static double Clamp(double value, double min, double max)
@@ -112,7 +113,7 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RefreshDevices()
+    private void RefreshDevices(bool saveAfterRefresh = true)
     {
         _refreshingDevices = true;
         try
@@ -128,28 +129,52 @@ public sealed partial class MainWindow : Window
             VirtualOutputComboBox.ItemsSource = renderDevices;
             MonitorOutputComboBox.ItemsSource = renderDevices;
 
-            InputDeviceComboBox.SelectedItem = PickById(captureDevices, oldInputId)
+            var selectedInput = PickById(captureDevices, oldInputId)
+                ?? PickByExactName(captureDevices, _settings.InputDeviceName)
                 ?? PickByName(captureDevices, _settings.InputDeviceName)
                 ?? PickByName(captureDevices, "Fifine")
                 ?? captureDevices.FirstOrDefault();
 
-            VirtualOutputComboBox.SelectedItem = PickById(renderDevices, oldVirtualId)
+            var selectedVirtual = PickById(renderDevices, oldVirtualId)
+                ?? PickByExactName(renderDevices, _settings.VirtualOutputDeviceName)
                 ?? PickByName(renderDevices, _settings.VirtualOutputDeviceName)
                 ?? PickByName(renderDevices, "CABLE Input")
                 ?? renderDevices.FirstOrDefault();
 
-            MonitorOutputComboBox.SelectedItem = PickById(renderDevices, oldMonitorId)
+            var selectedMonitor = PickById(renderDevices, oldMonitorId)
+                ?? PickByExactName(renderDevices, _settings.MonitorOutputDeviceName)
                 ?? PickByName(renderDevices, _settings.MonitorOutputDeviceName)
                 ?? PickByName(renderDevices, "Realtek")
                 ?? renderDevices.FirstOrDefault();
 
+            InputDeviceComboBox.SelectedItem = selectedInput;
+            VirtualOutputComboBox.SelectedItem = selectedVirtual;
+            MonitorOutputComboBox.SelectedItem = selectedMonitor;
+
             AppendLog($"Devices refreshed: {captureDevices.Count} capture, {renderDevices.Count} render.");
-            SaveCurrentSettings();
+            AppendLog($"Selected input: {selectedInput?.FriendlyName ?? "none"}");
+            AppendLog($"Selected virtual output: {selectedVirtual?.FriendlyName ?? "none"}");
+            AppendLog($"Selected monitor: {selectedMonitor?.FriendlyName ?? "none"}");
+
+            if (saveAfterRefresh && !_loadingSettings)
+            {
+                SaveCurrentSettings();
+            }
         }
         finally
         {
             _refreshingDevices = false;
         }
+    }
+
+    private static AudioDeviceInfo? PickByExactName(IReadOnlyList<AudioDeviceInfo> devices, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        return devices.FirstOrDefault(d => string.Equals(d.FriendlyName, text, StringComparison.OrdinalIgnoreCase));
     }
 
     private static AudioDeviceInfo? PickByName(IReadOnlyList<AudioDeviceInfo> devices, string? text)
@@ -380,7 +405,7 @@ public sealed partial class MainWindow : Window
 
     private void OnRouteSettingChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_refreshingDevices)
+        if (_refreshingDevices || _loadingSettings)
         {
             return;
         }
@@ -392,12 +417,20 @@ public sealed partial class MainWindow : Window
     private void OnDelayChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateDelayLabel();
-        SaveCurrentSettings();
+        if (!_loadingSettings)
+        {
+            SaveCurrentSettings();
+        }
     }
 
     private void OnSoundVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateSoundVolumeLabels();
+        if (_loadingSettings)
+        {
+            return;
+        }
+
         SaveCurrentSettings();
         if (_engine is not null)
         {
@@ -409,13 +442,19 @@ public sealed partial class MainWindow : Window
     private void OnOutputVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateOutputVolumeLabels();
-        ApplyLiveSettings("master output volume changed");
+        if (!_loadingSettings)
+        {
+            ApplyLiveSettings("master output volume changed");
+        }
     }
 
     private void OnVoiceSettingsChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateVoiceSettingLabels();
-        ApplyLiveSettings("voice setting changed");
+        if (!_loadingSettings)
+        {
+            ApplyLiveSettings("voice setting changed");
+        }
     }
 
     private void OnToggleVoiceMonitorClick(object sender, RoutedEventArgs e)
