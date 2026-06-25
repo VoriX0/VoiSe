@@ -61,7 +61,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.9 UI started.");
+        AppendLog("Gate 5.10 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -83,20 +83,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.9 restore started.");
+            StartupLog.Write("Gate 5.10 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.9 scalar settings applied.");
+            StartupLog.Write("Gate 5.10 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.9 restore completed.");
+            StartupLog.Write("Gate 5.10 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.9 restore error: " + ex);
+            StartupLog.Write("Gate 5.10 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -1008,13 +1008,46 @@ public sealed partial class MainWindow : Window
         _settingsStore.Save(_settings);
     }
 
+    private void OnSoundListPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        ScrollByMouseWheel(SoundListScrollViewer, e);
+    }
+
+    private void OnLogPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        ScrollByMouseWheel(LogScrollViewer, e);
+    }
+
+    private static void ScrollByMouseWheel(ScrollViewer scrollViewer, PointerRoutedEventArgs e)
+    {
+        if (scrollViewer is null)
+        {
+            return;
+        }
+
+        var point = e.GetCurrentPoint(scrollViewer);
+        var delta = point.Properties.MouseWheelDelta;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        var targetOffset = scrollViewer.VerticalOffset - delta;
+        targetOffset = Math.Max(0, Math.Min(scrollViewer.ScrollableHeight, targetOffset));
+        scrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
+        e.Handled = true;
+    }
+
     private void AppendLog(string message)
     {
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        LogTextBox.Text = string.IsNullOrEmpty(LogTextBox.Text)
+        LogTextBlock.Text = string.IsNullOrEmpty(LogTextBlock.Text)
             ? line
-            : LogTextBox.Text + Environment.NewLine + line;
-        LogTextBox.SelectionStart = LogTextBox.Text.Length;
-        LogTextBox.SelectionLength = 0;
+            : LogTextBlock.Text + Environment.NewLine + line;
+
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            LogScrollViewer.ChangeView(null, LogScrollViewer.ScrollableHeight, null, disableAnimation: true);
+        });
     }
 }

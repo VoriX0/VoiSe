@@ -6,10 +6,10 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.9 - SoundBoard Timeline &amp; Scroll Fix">
+    Title="VoiSe Gate 5.10 - SoundBoard Scroll Wheel Fix">
 
 
-    <Grid Padding="20" RowSpacing="14">
+    <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -21,13 +21,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                <TextBlock Text="VoiSe Gate 5.9" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="SoundBoard polish: timeline and scroll fixes" Opacity="0.75" />
+                <TextBlock Text="VoiSe Gate 5.10" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="SoundBoard polish: reliable wheel scrolling" Opacity="0.75" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Start Engine" Click="OnStartEngineClick" />
-                    <Button Content="Stop Engine" Click="OnStopEngineClick" />
+                    <Button Content="Start Engine" MinWidth="132" Height="44" Padding="18,8" FontSize="15" Click="OnStartEngineClick" />
+                    <Button Content="Stop Engine" MinWidth="132" Height="44" Padding="18,8" FontSize="15" Click="OnStopEngineClick" />
                 </StackPanel>
                 <TextBlock x:Name="EngineStatusTextBlock" Text="Stopped" HorizontalAlignment="Right" Opacity="0.8" />
             </StackPanel>
@@ -128,18 +128,42 @@
                             <Button Content="Delete Track" Click="OnDeleteSoundClick" />
                         </StackPanel>
 
-                        <ListView Grid.Row="3" x:Name="SoundListView" Background="#01000000" MinHeight="260" DisplayMemberPath="ListText" SelectionChanged="OnSoundSelectionChanged" RightTapped="OnSoundListRightTapped" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollMode="Enabled" ScrollViewer.IsVerticalRailEnabled="True" IsTabStop="True">
-                            <ListView.ContextFlyout>
-                                <MenuFlyout>
-                                    <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
-                                    <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
-                                    <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
-                                    <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
-                                    <MenuFlyoutSeparator />
-                                    <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
-                                </MenuFlyout>
-                            </ListView.ContextFlyout>
-                        </ListView>
+                        <ScrollViewer Grid.Row="3"
+                                      x:Name="SoundListScrollViewer"
+                                      Background="Transparent"
+                                      MinHeight="360"
+                                      VerticalAlignment="Stretch"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalScrollBarVisibility="Visible"
+                                      VerticalScrollMode="Enabled"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled"
+                                      PointerWheelChanged="OnSoundListPointerWheelChanged">
+                            <ListView x:Name="SoundListView"
+                                      Background="Transparent"
+                                      DisplayMemberPath="ListText"
+                                      SelectionChanged="OnSoundSelectionChanged"
+                                      RightTapped="OnSoundListRightTapped"
+                                      VerticalAlignment="Stretch"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollMode="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled"
+                                      IsTabStop="True"
+                                      PointerWheelChanged="OnSoundListPointerWheelChanged">
+                                <ListView.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
+                                        <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
+                                        <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
+                                        <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
+                                    </MenuFlyout>
+                                </ListView.ContextFlyout>
+                            </ListView>
+                        </ScrollViewer>
                     </Grid>
 
                 </Grid>
@@ -171,7 +195,7 @@
 
             <TabViewItem Header="Scenes" IsClosable="False">
                 <StackPanel Spacing="12" Padding="0,16,0,0">
-                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.7. This tab reserves the final navigation structure from the start." />
+                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.10. This tab reserves the final navigation structure from the start." />
                     <TextBlock Text="Planned scene content:" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="• voice preset&#x0a;• one background loop sound&#x0a;• several one-shot sounds&#x0a;• scene mixer settings" />
                 </StackPanel>
@@ -217,7 +241,27 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <TextBox Grid.Row="1" x:Name="LogTextBox" Header="Log" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalAlignment="Stretch" ScrollViewer.VerticalScrollBarVisibility="Visible" ScrollViewer.VerticalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                    <Grid Grid.Row="1" RowSpacing="6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Log" FontWeight="SemiBold" />
+                        <ScrollViewer Grid.Row="1"
+                                      x:Name="LogScrollViewer"
+                                      Background="Transparent"
+                                      VerticalAlignment="Stretch"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalScrollBarVisibility="Visible"
+                                      VerticalScrollMode="Enabled"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled"
+                                      PointerWheelChanged="OnLogPointerWheelChanged">
+                            <TextBlock x:Name="LogTextBlock"
+                                       TextWrapping="Wrap"
+                                       PointerWheelChanged="OnLogPointerWheelChanged" />
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </TabViewItem>
         </TabView>
