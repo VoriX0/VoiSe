@@ -1,8 +1,1 @@
-VoiSe Gate 2.0
-
-Changes:
-- Added unified per-route mixer for microphone + soundboard.
-- SoundBoard monitor starts immediately.
-- SoundBoard virtual microphone route uses configurable delay.
-- Limiter is applied after mic + soundboard mixing.
-- Added Gate2UnifiedAudioEngine and shared SoundboardTransport.
+VoiSe Gate 3.4 - WinUI startup fixed
