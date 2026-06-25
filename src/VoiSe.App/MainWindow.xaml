@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.10 - SoundBoard Scroll Wheel Fix">
+    Title="VoiSe Gate 5.11 - SoundBoard Scroll Area Fix">
 
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
@@ -21,13 +21,13 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                <TextBlock Text="VoiSe Gate 5.10" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="SoundBoard polish: reliable wheel scrolling" Opacity="0.75" />
+                <TextBlock Text="VoiSe Gate 5.11" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="SoundBoard polish: full-area scrolling and double-click play" Opacity="0.75" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Start Engine" MinWidth="132" Height="44" Padding="18,8" FontSize="15" Click="OnStartEngineClick" />
-                    <Button Content="Stop Engine" MinWidth="132" Height="44" Padding="18,8" FontSize="15" Click="OnStopEngineClick" />
+                    <Button Content="Start Engine" MinWidth="154" Height="50" Padding="22,10" FontSize="16" Click="OnStartEngineClick" />
+                    <Button Content="Stop Engine" MinWidth="154" Height="50" Padding="22,10" FontSize="16" Click="OnStopEngineClick" />
                 </StackPanel>
                 <TextBlock x:Name="EngineStatusTextBlock" Text="Stopped" HorizontalAlignment="Right" Opacity="0.8" />
             </StackPanel>
@@ -101,7 +101,7 @@
                     </Grid>
 
                     <!-- BODY -->
-                    <Grid Grid.Row="1" RowSpacing="8">
+                    <Grid x:Name="SoundBoardBodyGrid" Grid.Row="1" RowSpacing="8" Background="Transparent">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -128,42 +128,48 @@
                             <Button Content="Delete Track" Click="OnDeleteSoundClick" />
                         </StackPanel>
 
-                        <ScrollViewer Grid.Row="3"
-                                      x:Name="SoundListScrollViewer"
-                                      Background="Transparent"
-                                      MinHeight="360"
-                                      VerticalAlignment="Stretch"
-                                      HorizontalAlignment="Stretch"
-                                      VerticalScrollBarVisibility="Visible"
-                                      VerticalScrollMode="Enabled"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      HorizontalScrollMode="Disabled"
-                                      PointerWheelChanged="OnSoundListPointerWheelChanged">
-                            <ListView x:Name="SoundListView"
-                                      Background="Transparent"
-                                      DisplayMemberPath="ListText"
-                                      SelectionChanged="OnSoundSelectionChanged"
-                                      RightTapped="OnSoundListRightTapped"
-                                      VerticalAlignment="Stretch"
-                                      HorizontalAlignment="Stretch"
-                                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                      ScrollViewer.VerticalScrollMode="Disabled"
-                                      ScrollViewer.HorizontalScrollMode="Disabled"
-                                      IsTabStop="True"
-                                      PointerWheelChanged="OnSoundListPointerWheelChanged">
-                                <ListView.ContextFlyout>
-                                    <MenuFlyout>
-                                        <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
-                                        <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
-                                        <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
-                                        <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
-                                    </MenuFlyout>
-                                </ListView.ContextFlyout>
-                            </ListView>
-                        </ScrollViewer>
+                        <Grid Grid.Row="3"
+                              x:Name="SoundListArea"
+                              Background="Transparent"
+                              VerticalAlignment="Stretch"
+                              HorizontalAlignment="Stretch"
+                              PointerWheelChanged="OnSoundListPointerWheelChanged">
+                            <ScrollViewer x:Name="SoundListScrollViewer"
+                                          Background="Transparent"
+                                          VerticalAlignment="Stretch"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalScrollBarVisibility="Visible"
+                                          VerticalScrollMode="Enabled"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalScrollMode="Disabled"
+                                          PointerWheelChanged="OnSoundListPointerWheelChanged">
+                                <ListView x:Name="SoundListView"
+                                          Background="Transparent"
+                                          DisplayMemberPath="ListText"
+                                          SelectionChanged="OnSoundSelectionChanged"
+                                          RightTapped="OnSoundListRightTapped"
+                                          DoubleTapped="OnSoundListDoubleTapped"
+                                          VerticalAlignment="Stretch"
+                                          HorizontalAlignment="Stretch"
+                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.VerticalScrollMode="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled"
+                                          IsTabStop="True"
+                                          PointerWheelChanged="OnSoundListPointerWheelChanged">
+                                    <ListView.ContextFlyout>
+                                        <MenuFlyout>
+                                            <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
+                                            <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
+                                            <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
+                                            <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
+                                            <MenuFlyoutSeparator />
+                                            <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
+                                        </MenuFlyout>
+                                    </ListView.ContextFlyout>
+                                </ListView>
+                            </ScrollViewer>
+                        </Grid>
                     </Grid>
 
                 </Grid>
@@ -241,7 +247,7 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Grid Grid.Row="1" RowSpacing="6">
+                    <Grid Grid.Row="1" x:Name="SettingsLogArea" RowSpacing="6" Background="Transparent">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />

@@ -44,6 +44,7 @@ public sealed partial class MainWindow : Window
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
+        RegisterWheelRoutingHandlers();
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         Closed += OnClosed;
         Activated += OnActivated;
@@ -61,9 +62,55 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.10 UI started.");
+        AppendLog("Gate 5.11 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
+    }
+
+    private void RegisterWheelRoutingHandlers()
+    {
+        var soundWheelHandler = new PointerEventHandler(OnSoundListPointerWheelChanged);
+        SoundListArea.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
+        SoundListScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
+        SoundListView.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
+
+        var logWheelHandler = new PointerEventHandler(OnLogPointerWheelChanged);
+        SettingsLogArea.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
+        LogScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
+        LogTextBlock.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
+
+        RootGrid.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnRootPointerWheelChanged), handledEventsToo: true);
+    }
+
+    private void OnRootPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.Handled)
+        {
+            return;
+        }
+
+        var selectedHeader = (MainTabView.SelectedItem as TabViewItem)?.Header?.ToString();
+        if (selectedHeader == "SoundBoard" && IsPointerInsideElement(e, SoundBoardBodyGrid))
+        {
+            ScrollByMouseWheel(SoundListScrollViewer, e);
+            return;
+        }
+
+        if (selectedHeader == "Settings" && IsPointerInsideElement(e, SettingsLogArea))
+        {
+            ScrollByMouseWheel(LogScrollViewer, e);
+        }
+    }
+
+    private static bool IsPointerInsideElement(PointerRoutedEventArgs e, FrameworkElement element)
+    {
+        if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+        {
+            return false;
+        }
+
+        var point = e.GetCurrentPoint(element).Position;
+        return point.X >= 0 && point.Y >= 0 && point.X <= element.ActualWidth && point.Y <= element.ActualHeight;
     }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
@@ -83,20 +130,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.10 restore started.");
+            StartupLog.Write("Gate 5.11 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.10 scalar settings applied.");
+            StartupLog.Write("Gate 5.11 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.10 restore completed.");
+            StartupLog.Write("Gate 5.11 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.10 restore error: " + ex);
+            StartupLog.Write("Gate 5.11 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -509,6 +556,19 @@ public sealed partial class MainWindow : Window
             SoundListView.SelectedItem = sound;
             _selectedSound = sound;
             _soundFilePath = sound.FilePath;
+        }
+    }
+
+    private void OnSoundListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+    {
+        if (FindAncestor<ListViewItem>(e.OriginalSource as DependencyObject) is { } item && item.Content is SoundBoardSound sound)
+        {
+            SoundListView.SelectedItem = sound;
+            _selectedSound = sound;
+            _soundFilePath = sound.FilePath;
+            SaveCurrentSettings();
+            PlaySelectedSound();
+            e.Handled = true;
         }
     }
 
@@ -1032,7 +1092,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var targetOffset = scrollViewer.VerticalOffset - delta;
+        var targetOffset = scrollViewer.VerticalOffset - (delta * 0.45);
         targetOffset = Math.Max(0, Math.Min(scrollViewer.ScrollableHeight, targetOffset));
         scrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
         e.Handled = true;
