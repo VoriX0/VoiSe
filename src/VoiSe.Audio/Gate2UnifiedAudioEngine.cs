@@ -104,6 +104,11 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
         _soundboard.Stop();
     }
 
+    public void SeekSound(double seconds)
+    {
+        _soundboard.Seek(seconds);
+    }
+
     public bool ToggleSoundPause()
     {
         return _soundboard.TogglePause();

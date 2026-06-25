@@ -33,6 +33,8 @@ public sealed partial class MainWindow : Window
     private bool _voiceMonitorEnabled;
     private bool _loadingSettings = true;
     private bool _loadedOnce;
+    private bool _timelineUserDragging;
+    private bool _updatingTimeline;
 
     public MainWindow()
     {
@@ -57,7 +59,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.1 UI started.");
+        AppendLog("Gate 5.2 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -79,20 +81,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.1 restore started.");
+            StartupLog.Write("Gate 5.2 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.1 scalar settings applied.");
+            StartupLog.Write("Gate 5.2 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.1 restore completed.");
+            StartupLog.Write("Gate 5.2 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.1 restore error: " + ex);
+            StartupLog.Write("Gate 5.2 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -687,6 +689,20 @@ public sealed partial class MainWindow : Window
 
     private void OnPlaySoundClick(object sender, RoutedEventArgs e) => PlaySelectedSound();
 
+    private void OnPlayPauseSoundClick(object sender, RoutedEventArgs e)
+    {
+        var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
+        if (!status.IsActive)
+        {
+            PlaySelectedSound();
+            return;
+        }
+
+        var paused = _engine?.ToggleSoundPause() ?? false;
+        UpdateTimeline();
+        AppendLog(paused ? "Sound paused." : "Sound resumed.");
+    }
+
     private void PlaySelectedSound()
     {
         if (_engine is null)
@@ -729,13 +745,6 @@ public sealed partial class MainWindow : Window
         AppendLog("Sound stopped.");
     }
 
-    private void OnPauseResumeSoundClick(object sender, RoutedEventArgs e)
-    {
-        if (_engine is null) return;
-        var paused = _engine.ToggleSoundPause();
-        PauseResumeButton.Content = paused ? "Resume" : "Pause";
-        AppendLog(paused ? "Sound paused." : "Sound resumed.");
-    }
 
     private void OnPreviousSoundClick(object sender, RoutedEventArgs e)
     {
@@ -805,19 +814,84 @@ public sealed partial class MainWindow : Window
         ApplyLiveSettings(_voiceMonitorEnabled ? "voice monitor enabled" : "voice monitor disabled");
     }
 
+    private void OnTimelinePointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (TimelineSlider.IsEnabled)
+        {
+            _timelineUserDragging = true;
+        }
+    }
+
+    private void OnTimelinePointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_timelineUserDragging)
+        {
+            return;
+        }
+
+        _timelineUserDragging = false;
+        SeekSoundToTimeline();
+    }
+
+    private void OnTimelineValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingTimeline)
+        {
+            return;
+        }
+
+        if (_timelineUserDragging)
+        {
+            CurrentTimeTextBlock.Text = FormatTime(TimelineSlider.Value);
+        }
+    }
+
+    private void SeekSoundToTimeline()
+    {
+        if (_engine is null)
+        {
+            return;
+        }
+
+        var seconds = Math.Max(0, Math.Min(TimelineSlider.Maximum, TimelineSlider.Value));
+        _engine.SeekSound(seconds);
+        UpdateTimeline();
+        AppendLog($"Sound seeked to {FormatTime(seconds)}.");
+    }
+
     private void OnTimelineTimerTick(object? sender, object e) => UpdateTimeline();
 
     private void UpdateTimeline()
     {
+        if (TimelineSlider is null)
+        {
+            return;
+        }
+
         var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
-        TimelineSlider.Maximum = Math.Max(1, status.DurationSeconds);
-        TimelineSlider.Value = Math.Min(TimelineSlider.Maximum, Math.Max(0, status.CurrentSeconds));
-        CurrentTimeTextBlock.Text = FormatTime(status.CurrentSeconds);
+        var max = Math.Max(1, status.DurationSeconds);
+
+        _updatingTimeline = true;
+        try
+        {
+            TimelineSlider.Maximum = max;
+            TimelineSlider.IsEnabled = status.IsActive;
+            if (!_timelineUserDragging)
+            {
+                TimelineSlider.Value = Math.Min(max, Math.Max(0, status.CurrentSeconds));
+            }
+        }
+        finally
+        {
+            _updatingTimeline = false;
+        }
+
+        CurrentTimeTextBlock.Text = FormatTime(_timelineUserDragging ? TimelineSlider.Value : status.CurrentSeconds);
         TotalTimeTextBlock.Text = FormatTime(status.DurationSeconds);
         TransportStatusTextBlock.Text = status.IsActive
             ? (status.IsPaused ? "Paused" : "Playing")
             : "No sound";
-        PauseResumeButton.Content = status.IsPaused ? "Resume" : "Pause";
+        PlayPauseButton.Content = status.IsActive && !status.IsPaused ? "⏸" : "▶";
     }
 
     private static string FormatTime(double seconds)

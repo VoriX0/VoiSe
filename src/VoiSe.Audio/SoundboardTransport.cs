@@ -85,6 +85,14 @@ public sealed class SoundboardTransport
         }
     }
 
+    public void Seek(double seconds)
+    {
+        lock (_sync)
+        {
+            _active?.Seek(seconds);
+        }
+    }
+
     public void UpdateVolumes(float virtualVolume, float monitorVolume)
     {
         lock (_sync)
@@ -132,6 +140,7 @@ public sealed class SoundboardTransport
         private float _monitorVolume;
         private int _virtualPosition;
         private int _monitorPosition;
+        private readonly int _initialVirtualDelaySamples;
         private int _remainingVirtualDelaySamples;
         private bool _virtualFinished;
         private bool _monitorFinished;
@@ -143,7 +152,8 @@ public sealed class SoundboardTransport
             _channels = channels;
             _virtualVolume = virtualVolume;
             _monitorVolume = monitorVolume;
-            _remainingVirtualDelaySamples = virtualDelaySamples;
+            _initialVirtualDelaySamples = Math.Max(0, virtualDelaySamples);
+            _remainingVirtualDelaySamples = _initialVirtualDelaySamples;
         }
 
         public bool IsFinished => _virtualFinished && _monitorFinished;
@@ -158,6 +168,17 @@ public sealed class SoundboardTransport
         {
             _virtualVolume = virtualVolume;
             _monitorVolume = monitorVolume;
+        }
+
+        public void Seek(double seconds)
+        {
+            var sampleFrame = (int)Math.Round(Math.Max(0, seconds) * _sampleRate);
+            var sampleIndex = Math.Clamp(sampleFrame * _channels, 0, _samples.Length);
+            _monitorPosition = sampleIndex;
+            _virtualPosition = sampleIndex;
+            _remainingVirtualDelaySamples = _initialVirtualDelaySamples;
+            _monitorFinished = _monitorPosition >= _samples.Length;
+            _virtualFinished = _virtualPosition >= _samples.Length;
         }
 
         public SoundboardStatus GetStatus()

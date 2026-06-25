@@ -5,7 +5,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.1 - SoundBoard Layout">
+    Title="VoiSe Gate 5.2 - SoundBoard Transport &amp; Timeline">
 
     <Grid Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -15,11 +15,11 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Spacing="4">
-            <TextBlock Text="VoiSe Gate 5.1" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="SoundBoard layout: transport head, category/track body, status bottom, persistent library" Opacity="0.75" />
+            <TextBlock Text="VoiSe Gate 5.2" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock Text="SoundBoard transport polish: seekable timeline, icon controls, separated bottom status" Opacity="0.75" />
         </StackPanel>
 
-        <TabView Grid.Row="1" IsAddTabButtonVisible="False" TabWidthMode="Equal">
+        <TabView x:Name="MainTabView" Grid.Row="1" IsAddTabButtonVisible="False" TabWidthMode="Equal">
             <TabViewItem Header="SoundBoard" IsClosable="False">
                 <Grid Padding="0,16,0,0" RowSpacing="12">
                     <Grid.RowDefinitions>
@@ -29,42 +29,49 @@
                     </Grid.RowDefinitions>
 
                     <!-- HEAD -->
-                    <Grid Grid.Row="0" ColumnSpacing="16" MinHeight="110">
+                    <Grid Grid.Row="0" ColumnSpacing="16" MinHeight="128">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" />
                             <ColumnDefinition Width="6*" />
                             <ColumnDefinition Width="2*" />
                         </Grid.ColumnDefinitions>
 
-                        <Grid Grid.Column="0" ColumnSpacing="6">
+                        <Grid Grid.Column="0" RowSpacing="6" ColumnSpacing="6" MaxWidth="260">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="48" />
+                                <RowDefinition Height="48" />
+                            </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Prev" Click="OnPreviousSoundClick" />
-                            <Button Grid.Column="1" Content="Play" Click="OnPlaySoundClick" />
-                            <Button Grid.Column="2" x:Name="PauseResumeButton" Content="Pause" Click="OnPauseResumeSoundClick" />
-                            <Button Grid.Column="3" Content="Stop" Click="OnStopSoundClick" />
-                            <Button Grid.Column="4" Content="Next" Click="OnNextSoundClick" />
+                            <Button Grid.Row="0" Grid.Column="0" Content="⏮" FontSize="20" Click="OnPreviousSoundClick" ToolTipService.ToolTip="Previous track" />
+                            <Button Grid.Row="0" Grid.Column="1" Content="⏭" FontSize="20" Click="OnNextSoundClick" ToolTipService.ToolTip="Next track" />
+                            <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Content="Stop" Click="OnStopSoundClick" ToolTipService.ToolTip="Stop sound" />
                         </Grid>
 
-                        <Grid Grid.Column="1" RowSpacing="4">
+                        <Grid Grid.Column="1" RowSpacing="6">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <Slider Grid.Row="0" x:Name="TimelineSlider" Minimum="0" Maximum="1" Value="0" IsEnabled="False" />
-                            <Grid Grid.Row="1">
+                            <TextBlock Grid.Row="0" x:Name="TransportStatusTextBlock" Text="No sound" HorizontalAlignment="Center" Opacity="0.75" />
+                            <Grid Grid.Row="1" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="52" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" x:Name="PlayPauseButton" Content="▶" FontSize="22" Click="OnPlayPauseSoundClick" ToolTipService.ToolTip="Play / Pause" />
+                                <Slider Grid.Column="1" x:Name="TimelineSlider" Minimum="0" Maximum="1" Value="0" IsEnabled="False" PointerPressed="OnTimelinePointerPressed" PointerReleased="OnTimelinePointerReleased" ValueChanged="OnTimelineValueChanged" />
+                            </Grid>
+                            <Grid Grid.Row="2" Margin="62,0,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="CurrentTimeTextBlock" Text="00:00" />
-                                <TextBlock Grid.Column="1" x:Name="TransportStatusTextBlock" Text="No sound" HorizontalAlignment="Center" Opacity="0.75" />
                                 <TextBlock Grid.Column="2" x:Name="TotalTimeTextBlock" Text="00:00" />
                             </Grid>
                         </Grid>
@@ -78,7 +85,7 @@
                     </Grid>
 
                     <!-- BODY -->
-                    <Grid Grid.Row="1" RowSpacing="10">
+                    <Grid Grid.Row="1" RowSpacing="14">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -104,7 +111,7 @@
                             </StackPanel>
                         </Grid>
 
-                        <ComboBox Grid.Row="1" x:Name="CategoryComboBox" DisplayMemberPath="Name" PlaceholderText="Choose category" SelectionChanged="OnCategorySelectionChanged" HorizontalAlignment="Stretch" />
+                        <ComboBox Grid.Row="1" x:Name="CategoryComboBox" DisplayMemberPath="Name" PlaceholderText="Choose category" SelectionChanged="OnCategorySelectionChanged" HorizontalAlignment="Stretch" Margin="0,0,0,10" />
 
                         <ListView Grid.Row="2" x:Name="SoundListView" DisplayMemberPath="ListText" SelectionChanged="OnSoundSelectionChanged" RightTapped="OnSoundListRightTapped">
                             <ListView.ContextFlyout>
@@ -120,10 +127,6 @@
                         </ListView>
                     </Grid>
 
-                    <!-- BOTTOM -->
-                    <Border Grid.Row="2" Padding="10" BorderThickness="1" BorderBrush="Gray" CornerRadius="6">
-                        <TextBlock x:Name="BottomStatsTextBlock" Text="Categories: 0 | Sounds in category: 0 | Category usage: 0" />
-                    </Border>
                 </Grid>
             </TabViewItem>
 
@@ -153,7 +156,7 @@
 
             <TabViewItem Header="Scenes" IsClosable="False">
                 <StackPanel Spacing="12" Padding="0,16,0,0">
-                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.1. This tab reserves the final navigation structure from the start." />
+                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.2. This tab reserves the final navigation structure from the start." />
                     <TextBlock Text="Planned scene content:" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="• voice preset&#x0a;• one background loop sound&#x0a;• several one-shot sounds&#x0a;• scene mixer settings" />
                 </StackPanel>
@@ -190,6 +193,9 @@
                             <Slider x:Name="SoundVirtualDelaySlider" Minimum="0" Maximum="300" Value="85" StepFrequency="1" ValueChanged="OnDelayChanged" />
                             <TextBlock Text="SoundBoard plays in headphones immediately, then reaches CABLE Input after this delay. Changes apply on next Play Sound." Opacity="0.7" TextWrapping="Wrap" />
                         </StackPanel>
+
+                        <TextBlock Text="Diagnostics" FontSize="18" FontWeight="SemiBold" />
+                        <TextBox x:Name="LogTextBox" Header="Log" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="140" />
                     </StackPanel>
                 </ScrollViewer>
             </TabViewItem>
@@ -210,7 +216,9 @@
                     <TextBlock x:Name="EngineStatusTextBlock" Text="Stopped" />
                 </StackPanel>
             </Border>
-            <TextBox Grid.Column="1" x:Name="LogTextBox" Header="Log" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="96" />
+            <Border Grid.Column="1" Padding="10" BorderThickness="1" BorderBrush="Gray" CornerRadius="6">
+                <TextBlock x:Name="BottomStatsTextBlock" Text="Categories: 0 | Sounds in category: 0 | Category usage: 0" VerticalAlignment="Center" />
+            </Border>
         </Grid>
     </Grid>
 </Window>
