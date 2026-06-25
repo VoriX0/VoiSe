@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -17,14 +16,15 @@ public sealed partial class MainWindow : Window
     private readonly AudioDeviceCatalog _catalog = new();
     private readonly DispatcherTimer _routeRestartTimer;
     private readonly SettingsStore _settingsStore = new();
-    private readonly VoiSeUserSettings _settings;
+    private VoiSeUserSettings _settings;
     private Gate2UnifiedAudioEngine? _engine;
     private string? _soundFilePath;
     private bool _refreshingDevices;
     private bool _manualStopRequested;
     private string _pendingRestartReason = "settings changed";
     private bool _voiceMonitorEnabled;
-    private bool _loadingSettings;
+    private bool _loadingSettings = true;
+    private bool _loadedOnce;
 
     public MainWindow()
     {
@@ -32,6 +32,7 @@ public sealed partial class MainWindow : Window
         _settings = _settingsStore.Load();
         InitializeComponent();
         Closed += OnClosed;
+        Activated += OnActivated;
 
         _routeRestartTimer = new DispatcherTimer
         {
@@ -39,57 +40,47 @@ public sealed partial class MainWindow : Window
         };
         _routeRestartTimer.Tick += OnRouteRestartTimerTick;
 
-        AppendLog("Gate 4.2 UI started.");
+        AppendLog("Gate 4.3 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
-        StartupLog.Write("MainWindow initialized; restoring settings next.");
-
-        DispatcherQueue.TryEnqueue(async () => await RestoreSettingsAndDevicesAsync());
+        StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
 
-    private async Task RestoreSettingsAndDevicesAsync()
+    private void OnActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (_loadedOnce)
+        {
+            return;
+        }
+
+        _loadedOnce = true;
+        RestoreSettingsAfterWindowActivation();
+    }
+
+    private void RestoreSettingsAfterWindowActivation()
     {
         _loadingSettings = true;
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Restore: started.");
+            StartupLog.Write("Gate 4.3 restore started.");
 
             ApplyStoredScalarSettingsToControls();
-            UpdateAllLabels();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Restore: scalar settings applied.");
+            StartupLog.Write("Gate 4.3 scalar settings applied.");
 
-            AppendLog("Loading audio devices...");
-            StartupLog.Write("Restore: loading capture devices.");
-            var captureDevices = await Task.Run(() =>
-            {
-                using var catalog = new AudioDeviceCatalog();
-                return catalog.ListCaptureDevices();
-            });
-
-            StartupLog.Write($"Restore: capture devices loaded: {captureDevices.Count}.");
-            StartupLog.Write("Restore: loading render devices.");
-            var renderDevices = await Task.Run(() =>
-            {
-                using var catalog = new AudioDeviceCatalog();
-                return catalog.ListRenderDevices();
-            });
-
-            StartupLog.Write($"Restore: render devices loaded: {renderDevices.Count}.");
-            ApplyDeviceLists(captureDevices, renderDevices, saveAfterRefresh: false);
-
-            UpdateAllLabels();
+            RefreshDevices(saveAfterRefresh: false);
             AppendLog("Settings restored.");
-            StartupLog.Write("Restore: completed.");
+            StartupLog.Write("Gate 4.3 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Settings restore error: " + ex);
+            StartupLog.Write("Gate 4.3 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
             _loadingSettings = false;
+            UpdateAllLabels();
         }
     }
 
@@ -106,6 +97,7 @@ public sealed partial class MainWindow : Window
         GateThresholdSlider.Value = Clamp(_settings.GateThresholdDb, -70, -20);
         CompressorThresholdSlider.Value = Clamp(_settings.CompressorThresholdDb, -40, 0);
         _voiceMonitorEnabled = _settings.VoiceMonitorEnabled;
+        UpdateAllLabels();
     }
 
     private static double Clamp(double value, double min, double max)
@@ -145,14 +137,8 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Refreshing audio devices...");
-            StartupLog.Write("RefreshDevices: loading capture devices.");
             var captureDevices = _catalog.ListCaptureDevices();
-            StartupLog.Write($"RefreshDevices: capture devices loaded: {captureDevices.Count}.");
-
-            StartupLog.Write("RefreshDevices: loading render devices.");
             var renderDevices = _catalog.ListRenderDevices();
-            StartupLog.Write($"RefreshDevices: render devices loaded: {renderDevices.Count}.");
-
             ApplyDeviceLists(captureDevices, renderDevices, saveAfterRefresh);
         }
         finally
@@ -197,7 +183,6 @@ public sealed partial class MainWindow : Window
         AppendLog($"Selected input: {selectedInput?.FriendlyName ?? "none"}");
         AppendLog($"Selected virtual output: {selectedVirtual?.FriendlyName ?? "none"}");
         AppendLog($"Selected monitor: {selectedMonitor?.FriendlyName ?? "none"}");
-        StartupLog.Write($"ApplyDeviceLists: input={selectedInput?.FriendlyName ?? "none"}; virtual={selectedVirtual?.FriendlyName ?? "none"}; monitor={selectedMonitor?.FriendlyName ?? "none"}.");
 
         if (saveAfterRefresh && !_loadingSettings)
         {
@@ -360,7 +345,7 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleEngineRestart(string reason)
     {
-        if (_engine is null || _refreshingDevices)
+        if (_engine is null || _refreshingDevices || _loadingSettings)
         {
             return;
         }

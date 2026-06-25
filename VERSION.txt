@@ -1,1 +1,1 @@
-Gate 4.2 - Persistent Settings Restore Fix
+VoiSe Gate 4.3 - settings restore after window activation
