@@ -60,7 +60,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.3 UI started.");
+        AppendLog("Gate 5.4 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -82,20 +82,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.3 restore started.");
+            StartupLog.Write("Gate 5.4 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.3 scalar settings applied.");
+            StartupLog.Write("Gate 5.4 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.3 restore completed.");
+            StartupLog.Write("Gate 5.4 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.3 restore error: " + ex);
+            StartupLog.Write("Gate 5.4 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -132,23 +132,12 @@ public sealed partial class MainWindow : Window
 
     private void OnMainTabSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        UpdateBottomPanelVisibility();
+        // Gate 5.4: bottom stats panel was removed. Settings tab owns the log panel now.
     }
 
     private void UpdateBottomPanelVisibility()
     {
-        if (BottomStatsTextBlock is null || LogTextBox is null || BottomEmptyTextBlock is null || MainTabView is null)
-        {
-            return;
-        }
-
-        var selectedHeader = (MainTabView.SelectedItem as TabViewItem)?.Header?.ToString() ?? string.Empty;
-        var isSoundBoard = string.Equals(selectedHeader, "SoundBoard", StringComparison.OrdinalIgnoreCase);
-        var isSettings = string.Equals(selectedHeader, "Settings", StringComparison.OrdinalIgnoreCase);
-
-        BottomStatsTextBlock.Visibility = isSoundBoard ? Visibility.Visible : Visibility.Collapsed;
-        LogTextBox.Visibility = isSettings ? Visibility.Visible : Visibility.Collapsed;
-        BottomEmptyTextBlock.Visibility = (!isSoundBoard && !isSettings) ? Visibility.Visible : Visibility.Collapsed;
+        // Gate 5.4: no shared bottom panel. Kept as a no-op for older call sites.
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -972,11 +961,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateBottomStats()
     {
-        if (BottomStatsTextBlock is null) return;
-        var category = CurrentCategory;
-        var soundCount = category is null ? 0 : _library.Sounds.Count(s => s.CategoryId == category.Id);
-        var usage = category?.UsageCount ?? 0;
-        BottomStatsTextBlock.Text = $"Categories: {_library.Categories.Count} | Sounds in selected category: {soundCount} | Category usage: {usage}";
+        // Gate 5.4: category/sound stats footer was removed from the UI.
     }
 
     private void SaveCurrentSettings()
