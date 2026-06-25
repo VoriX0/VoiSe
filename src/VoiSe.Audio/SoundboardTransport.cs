@@ -19,7 +19,29 @@ public sealed class SoundboardTransport
         {
             lock (_sync)
             {
+                return _active is not null && !_active.IsPaused;
+            }
+        }
+    }
+
+    public bool IsActive
+    {
+        get
+        {
+            lock (_sync)
+            {
                 return _active is not null;
+            }
+        }
+    }
+
+    public bool IsPaused
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _active?.IsPaused ?? false;
             }
         }
     }
@@ -33,6 +55,8 @@ public sealed class SoundboardTransport
         {
             _active = new ActiveSound(
                 data,
+                _format.SampleRate,
+                _format.Channels,
                 Math.Clamp(virtualVolume, 0.0f, 2.0f),
                 Math.Clamp(monitorVolume, 0.0f, 2.0f),
                 delaySamples);
@@ -47,6 +71,20 @@ public sealed class SoundboardTransport
         }
     }
 
+    public bool TogglePause()
+    {
+        lock (_sync)
+        {
+            if (_active is null)
+            {
+                return false;
+            }
+
+            _active.TogglePause();
+            return _active.IsPaused;
+        }
+    }
+
     public void UpdateVolumes(float virtualVolume, float monitorVolume)
     {
         lock (_sync)
@@ -54,6 +92,14 @@ public sealed class SoundboardTransport
             _active?.UpdateVolumes(
                 Math.Clamp(virtualVolume, 0.0f, 2.0f),
                 Math.Clamp(monitorVolume, 0.0f, 2.0f));
+        }
+    }
+
+    public SoundboardStatus GetStatus()
+    {
+        lock (_sync)
+        {
+            return _active?.GetStatus() ?? SoundboardStatus.Empty;
         }
     }
 
@@ -80,6 +126,8 @@ public sealed class SoundboardTransport
     private sealed class ActiveSound
     {
         private readonly float[] _samples;
+        private readonly int _sampleRate;
+        private readonly int _channels;
         private float _virtualVolume;
         private float _monitorVolume;
         private int _virtualPosition;
@@ -88,15 +136,23 @@ public sealed class SoundboardTransport
         private bool _virtualFinished;
         private bool _monitorFinished;
 
-        public ActiveSound(float[] samples, float virtualVolume, float monitorVolume, int virtualDelaySamples)
+        public ActiveSound(float[] samples, int sampleRate, int channels, float virtualVolume, float monitorVolume, int virtualDelaySamples)
         {
             _samples = samples;
+            _sampleRate = sampleRate;
+            _channels = channels;
             _virtualVolume = virtualVolume;
             _monitorVolume = monitorVolume;
             _remainingVirtualDelaySamples = virtualDelaySamples;
         }
 
         public bool IsFinished => _virtualFinished && _monitorFinished;
+        public bool IsPaused { get; private set; }
+
+        public void TogglePause()
+        {
+            IsPaused = !IsPaused;
+        }
 
         public void UpdateVolumes(float virtualVolume, float monitorVolume)
         {
@@ -104,8 +160,21 @@ public sealed class SoundboardTransport
             _monitorVolume = monitorVolume;
         }
 
+        public SoundboardStatus GetStatus()
+        {
+            var durationSeconds = _samples.Length / (double)_channels / _sampleRate;
+            var currentSeconds = Math.Min(durationSeconds, _monitorPosition / (double)_channels / _sampleRate);
+            return new SoundboardStatus(true, IsPaused, currentSeconds, durationSeconds);
+        }
+
         public int Read(AudioRoute route, float[] buffer, int offset, int count)
         {
+            if (IsPaused)
+            {
+                Array.Clear(buffer, offset, count);
+                return count;
+            }
+
             var written = 0;
 
             if (route == AudioRoute.VirtualMicrophone && _remainingVirtualDelaySamples > 0)
@@ -152,4 +221,9 @@ public sealed class SoundboardTransport
             return written + toCopy;
         }
     }
+}
+
+public readonly record struct SoundboardStatus(bool IsActive, bool IsPaused, double CurrentSeconds, double DurationSeconds)
+{
+    public static SoundboardStatus Empty { get; } = new(false, false, 0, 0);
 }

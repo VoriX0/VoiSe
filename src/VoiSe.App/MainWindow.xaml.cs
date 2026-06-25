@@ -1,10 +1,13 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using NAudio.CoreAudioApi;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -15,6 +18,7 @@ public sealed partial class MainWindow : Window
 {
     private readonly AudioDeviceCatalog _catalog = new();
     private readonly DispatcherTimer _routeRestartTimer;
+    private readonly DispatcherTimer _timelineTimer;
     private readonly SettingsStore _settingsStore = new();
     private readonly SoundBoardLibraryStore _libraryStore;
     private VoiSeUserSettings _settings;
@@ -46,7 +50,14 @@ public sealed partial class MainWindow : Window
         };
         _routeRestartTimer.Tick += OnRouteRestartTimerTick;
 
-        AppendLog("Gate 5 UI started.");
+        _timelineTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _timelineTimer.Tick += OnTimelineTimerTick;
+        _timelineTimer.Start();
+
+        AppendLog("Gate 5.1 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -68,20 +79,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5 restore started.");
+            StartupLog.Write("Gate 5.1 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5 scalar settings applied.");
+            StartupLog.Write("Gate 5.1 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5 restore completed.");
+            StartupLog.Write("Gate 5.1 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5 restore error: " + ex);
+            StartupLog.Write("Gate 5.1 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -121,6 +132,7 @@ public sealed partial class MainWindow : Window
         _manualStopRequested = true;
         SaveCurrentSettings();
         StopEngine(log: false);
+        _timelineTimer.Stop();
         _catalog.Dispose();
     }
 
@@ -198,21 +210,13 @@ public sealed partial class MainWindow : Window
 
     private static AudioDeviceInfo? PickByExactName(IReadOnlyList<AudioDeviceInfo> devices, string? text)
     {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
+        if (string.IsNullOrWhiteSpace(text)) return null;
         return devices.FirstOrDefault(d => string.Equals(d.FriendlyName, text, StringComparison.OrdinalIgnoreCase));
     }
 
     private static AudioDeviceInfo? PickByName(IReadOnlyList<AudioDeviceInfo> devices, string? text)
     {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
+        if (string.IsNullOrWhiteSpace(text)) return null;
         return devices.FirstOrDefault(d => d.FriendlyName.Contains(text, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -236,7 +240,6 @@ public sealed partial class MainWindow : Window
             if (selectedCategory is not null)
             {
                 CategoryComboBox.SelectedItem = selectedCategory;
-                CategoryListView.SelectedItem = selectedCategory;
             }
 
             RefreshSoundList();
@@ -251,7 +254,7 @@ public sealed partial class MainWindow : Window
                 _soundFilePath = _selectedSound.FilePath;
             }
 
-            UpdateSelectedSoundLabel();
+            UpdateBottomStats();
             AppendLog($"SoundBoard library loaded: {_library.Categories.Count} categories, {_library.Sounds.Count} sounds.");
             AppendLog($"SoundBoard data: {_libraryStore.LibraryPath}");
         }
@@ -270,7 +273,6 @@ public sealed partial class MainWindow : Window
     {
         var categories = _library.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToList();
         CategoryComboBox.ItemsSource = categories;
-        CategoryListView.ItemsSource = categories;
     }
 
     private void RefreshSoundList()
@@ -281,28 +283,17 @@ public sealed partial class MainWindow : Window
         {
             SoundListView.SelectedItem = sounds.FirstOrDefault(s => s.Id == _selectedSound.Id);
         }
-        UpdateSelectedSoundLabel();
+        UpdateBottomStats();
     }
 
     private IEnumerable<SoundBoardSound> FilterSoundsForSelectedCategory()
     {
-        var category = CategoryComboBox.SelectedItem as SoundBoardCategory
-            ?? CategoryListView.SelectedItem as SoundBoardCategory;
-        var search = SoundSearchTextBox?.Text?.Trim();
-
+        var category = CategoryComboBox.SelectedItem as SoundBoardCategory;
         var query = _library.Sounds.AsEnumerable();
         if (category is not null)
         {
             query = query.Where(s => s.CategoryId == category.Id);
         }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(s =>
-                s.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                s.OriginalFileName.Contains(search, StringComparison.OrdinalIgnoreCase));
-        }
-
         return query.OrderBy(s => s.DisplayName);
     }
 
@@ -320,19 +311,13 @@ public sealed partial class MainWindow : Window
             : _library.Sounds.FirstOrDefault(s => s.Id == soundId);
     }
 
+    private SoundBoardCategory? CurrentCategory => CategoryComboBox.SelectedItem as SoundBoardCategory;
+
     private void OnCategorySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_loadingLibrary)
-        {
-            return;
-        }
+        if (_loadingLibrary) return;
 
-        var selected = CategoryComboBox.SelectedItem as SoundBoardCategory;
-        if (selected is not null && CategoryListView.SelectedItem != selected)
-        {
-            CategoryListView.SelectedItem = selected;
-        }
-
+        var selected = CurrentCategory;
         _settings.LastSoundCategoryId = selected?.Id;
         _selectedSound = null;
         _soundFilePath = null;
@@ -340,68 +325,31 @@ public sealed partial class MainWindow : Window
         SaveCurrentSettings();
     }
 
-    private void OnCategoryListSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loadingLibrary)
-        {
-            return;
-        }
-
-        var selected = CategoryListView.SelectedItem as SoundBoardCategory;
-        if (selected is not null && CategoryComboBox.SelectedItem != selected)
-        {
-            CategoryComboBox.SelectedItem = selected;
-        }
-    }
-
-    private void OnSoundSearchChanged(object sender, TextChangedEventArgs e)
-    {
-        if (!_loadingLibrary)
-        {
-            RefreshSoundList();
-        }
-    }
-
     private void OnSoundSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_loadingLibrary)
-        {
-            return;
-        }
+        if (_loadingLibrary) return;
 
         _selectedSound = SoundListView.SelectedItem as SoundBoardSound;
         _soundFilePath = _selectedSound?.FilePath;
-        UpdateSelectedSoundLabel();
         SaveCurrentSettings();
+        UpdateBottomStats();
     }
 
     private async void OnAddSoundClick(object sender, RoutedEventArgs e)
     {
-        var category = CategoryComboBox.SelectedItem as SoundBoardCategory
-            ?? CategoryListView.SelectedItem as SoundBoardCategory
-            ?? _library.Categories.OrderBy(c => c.SortOrder).FirstOrDefault();
-
+        var category = CurrentCategory ?? _library.Categories.OrderBy(c => c.SortOrder).FirstOrDefault();
         if (category is null)
         {
             AppendLog("Create a category before adding sounds.");
             return;
         }
 
-        var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add(".wav");
-        picker.FileTypeFilter.Add(".mp3");
-        picker.FileTypeFilter.Add(".ogg");
-        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
-        {
-            return;
-        }
+        var filePath = await PickSoundFileAsync();
+        if (filePath is null) return;
 
         try
         {
-            var sound = _libraryStore.AddSound(_library, file.Path, category);
+            var sound = _libraryStore.AddSound(_library, filePath, category);
             _selectedSound = sound;
             _soundFilePath = sound.FilePath;
             _settings.LastSoundCategoryId = category.Id;
@@ -410,23 +358,35 @@ public sealed partial class MainWindow : Window
             RefreshSoundList();
             SoundListView.SelectedItem = sound;
             SaveCurrentSettings();
-            AppendLog($"Sound added to {category.Name}: {sound.DisplayName}");
+            AppendLog($"Track added to {category.Name}: {sound.DisplayName}");
         }
         catch (Exception ex)
         {
-            AppendLog($"Add sound error: {ex.Message}");
+            AppendLog($"Add track error: {ex.Message}");
         }
     }
 
-    private void OnAddCategoryClick(object sender, RoutedEventArgs e)
+    private async Task<string?> PickSoundFileAsync()
     {
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".wav");
+        picker.FileTypeFilter.Add(".mp3");
+        picker.FileTypeFilter.Add(".ogg");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSingleFileAsync();
+        return file?.Path;
+    }
+
+    private async void OnAddCategoryClick(object sender, RoutedEventArgs e)
+    {
+        var name = await ShowTextDialogAsync("Create category", "Category name", "New Category");
+        if (name is null) return;
+
         try
         {
-            var category = _libraryStore.AddCategory(_library, NewCategoryTextBox.Text);
-            NewCategoryTextBox.Text = string.Empty;
+            var category = _libraryStore.AddCategory(_library, name);
             RefreshCategoryControls();
             CategoryComboBox.SelectedItem = category;
-            CategoryListView.SelectedItem = category;
             SaveCurrentSettings();
             AppendLog($"Category added: {category.Name}");
         }
@@ -436,11 +396,61 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void OnRenameCategoryClick(object sender, RoutedEventArgs e)
+    {
+        var category = CurrentCategory;
+        if (category is null)
+        {
+            AppendLog("Select a category to rename.");
+            return;
+        }
+
+        var name = await ShowTextDialogAsync("Rename category", "Category name", category.Name);
+        if (name is null) return;
+
+        _libraryStore.RenameCategory(_library, category, name);
+        RefreshCategoryControls();
+        CategoryComboBox.SelectedItem = PickCategory(category.Id);
+        SaveCurrentSettings();
+        AppendLog($"Category renamed: {name}");
+    }
+
+    private void OnDeleteCategoryClick(object sender, RoutedEventArgs e)
+    {
+        var category = CurrentCategory;
+        if (category is null)
+        {
+            AppendLog("Select a category to delete.");
+            return;
+        }
+
+        try
+        {
+            _libraryStore.DeleteCategory(_library, category, deleteFiles: true);
+            _selectedSound = null;
+            _soundFilePath = null;
+            RefreshCategoryControls();
+            CategoryComboBox.SelectedItem = _library.Categories.OrderBy(c => c.SortOrder).FirstOrDefault();
+            RefreshSoundList();
+            SaveCurrentSettings();
+            AppendLog($"Category deleted: {category.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Delete category error: {ex.Message}");
+        }
+    }
+
     private void OnDeleteSoundClick(object sender, RoutedEventArgs e)
+    {
+        DeleteSelectedSound();
+    }
+
+    private void DeleteSelectedSound()
     {
         if (_selectedSound is null)
         {
-            AppendLog("Select a sound to delete.");
+            AppendLog("Select a track to delete.");
             return;
         }
 
@@ -452,26 +462,97 @@ public sealed partial class MainWindow : Window
         _settings.LastSoundFilePath = null;
         RefreshSoundList();
         SaveCurrentSettings();
-        AppendLog($"Sound deleted: {deletedName}");
+        AppendLog($"Track deleted: {deletedName}");
     }
 
-    private void UpdateSelectedSoundLabel()
+    private async Task<string?> ShowTextDialogAsync(string title, string placeholder, string value)
     {
-        if (SelectedSoundLabel is null)
+        var textBox = new TextBox
         {
-            return;
-        }
+            PlaceholderText = placeholder,
+            Text = value,
+            MinWidth = 320
+        };
 
-        if (_selectedSound is null)
+        var dialog = new ContentDialog
         {
-            SelectedSoundLabel.Text = "Selected sound: none";
-            return;
-        }
+            Title = title,
+            Content = textBox,
+            PrimaryButtonText = "OK",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = ((FrameworkElement)Content).XamlRoot
+        };
 
-        var category = _library.Categories.FirstOrDefault(c => c.Id == _selectedSound.CategoryId)?.Name ?? "unknown";
-        var missing = File.Exists(_selectedSound.FilePath) ? string.Empty : " (file missing)";
-        SelectedSoundLabel.Text = $"Selected sound: {_selectedSound.DisplayName} / {category}{missing}";
+        var result = await dialog.ShowAsync();
+        return result == ContentDialogResult.Primary ? textBox.Text.Trim() : null;
     }
+
+    private void OnSoundListRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (FindAncestor<ListViewItem>(e.OriginalSource as DependencyObject) is { } item && item.Content is SoundBoardSound sound)
+        {
+            SoundListView.SelectedItem = sound;
+            _selectedSound = sound;
+            _soundFilePath = sound.FilePath;
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? start) where T : DependencyObject
+    {
+        var current = start;
+        while (current is not null)
+        {
+            if (current is T match) return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private void OnSoundContextPlayClick(object sender, RoutedEventArgs e) => PlaySelectedSound();
+
+    private async void OnSoundContextAssignHotkeyClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSound is null) return;
+        var hotkey = await ShowTextDialogAsync("Assign hotkey", "Example: Ctrl+Alt+1", _selectedSound.Hotkey ?? string.Empty);
+        if (hotkey is null) return;
+        _libraryStore.SetHotkey(_library, _selectedSound, hotkey);
+        RefreshSoundList();
+        SaveCurrentSettings();
+        AppendLog($"Hotkey assigned: {_selectedSound.DisplayName} -> {hotkey}");
+    }
+
+    private async void OnSoundContextRenameClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSound is null) return;
+        var name = await ShowTextDialogAsync("Rename track", "Display name", _selectedSound.DisplayName);
+        if (name is null) return;
+        _libraryStore.RenameSound(_library, _selectedSound, name);
+        RefreshSoundList();
+        SaveCurrentSettings();
+        AppendLog($"Track renamed: {name}");
+    }
+
+    private async void OnSoundContextReplaceFileClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSound is null) return;
+        var path = await PickSoundFileAsync();
+        if (path is null) return;
+        try
+        {
+            _libraryStore.ReplaceSoundFile(_library, _selectedSound, path);
+            _soundFilePath = _selectedSound.FilePath;
+            RefreshSoundList();
+            SaveCurrentSettings();
+            AppendLog($"Track file replaced: {_selectedSound.DisplayName}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Replace file error: {ex.Message}");
+        }
+    }
+
+    private void OnSoundContextDeleteClick(object sender, RoutedEventArgs e) => DeleteSelectedSound();
 
     private void OnStartEngineClick(object sender, RoutedEventArgs e)
     {
@@ -489,10 +570,7 @@ public sealed partial class MainWindow : Window
     {
         if (_engine is not null)
         {
-            if (logAlreadyRunning)
-            {
-                AppendLog("Engine is already running.");
-            }
+            if (logAlreadyRunning) AppendLog("Engine is already running.");
             return true;
         }
 
@@ -539,18 +617,12 @@ public sealed partial class MainWindow : Window
 
     private void StopEngine(bool log)
     {
-        if (_engine is null)
-        {
-            return;
-        }
+        if (_engine is null) return;
 
         try
         {
             _engine.Dispose();
-            if (log)
-            {
-                AppendLog("Engine stopped.");
-            }
+            if (log) AppendLog("Engine stopped.");
         }
         catch (Exception ex)
         {
@@ -565,11 +637,7 @@ public sealed partial class MainWindow : Window
 
     private void RestartEngine(string reason)
     {
-        if (_engine is null || _manualStopRequested)
-        {
-            return;
-        }
-
+        if (_engine is null || _manualStopRequested) return;
         AppendLog($"Engine auto-restart: {reason}.");
         StopEngine(log: false);
         StartEngine(logAlreadyRunning: false);
@@ -583,11 +651,7 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleEngineRestart(string reason)
     {
-        if (_engine is null || _refreshingDevices || _loadingSettings)
-        {
-            return;
-        }
-
+        if (_engine is null || _refreshingDevices || _loadingSettings) return;
         _pendingRestartReason = reason;
         _routeRestartTimer.Stop();
         _routeRestartTimer.Start();
@@ -599,10 +663,7 @@ public sealed partial class MainWindow : Window
         UpdateAllLabels();
         SaveCurrentSettings();
 
-        if (_engine is null)
-        {
-            return;
-        }
+        if (_engine is null) return;
 
         _engine.UpdateEffectSettings(CreateEffectSettings());
         AppendLog($"Live settings applied: {reason}.");
@@ -624,7 +685,9 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private void OnPlaySoundClick(object sender, RoutedEventArgs e)
+    private void OnPlaySoundClick(object sender, RoutedEventArgs e) => PlaySelectedSound();
+
+    private void PlaySelectedSound()
     {
         if (_engine is null)
         {
@@ -635,7 +698,7 @@ public sealed partial class MainWindow : Window
         var soundPath = _selectedSound?.FilePath ?? _soundFilePath;
         if (string.IsNullOrWhiteSpace(soundPath) || !File.Exists(soundPath))
         {
-            AppendLog("Choose an existing sound from the SoundBoard library first.");
+            AppendLog("Choose an existing track from the SoundBoard library first.");
             return;
         }
 
@@ -646,6 +709,11 @@ public sealed partial class MainWindow : Window
             var virtualVolume = (float)SoundVirtualVolumeSlider.Value;
             var monitorVolume = (float)SoundMonitorVolumeSlider.Value;
             _engine.PlaySound(soundPath, virtualVolume, monitorVolume, delayMs);
+            if (_selectedSound is not null)
+            {
+                _libraryStore.IncrementUsage(_library, _selectedSound);
+            }
+            UpdateBottomStats();
             AppendLog($"Sound started: {_selectedSound?.DisplayName ?? Path.GetFileName(soundPath)}. Virtual delay: {delayMs} ms.");
         }
         catch (Exception ex)
@@ -656,22 +724,46 @@ public sealed partial class MainWindow : Window
 
     private void OnStopSoundClick(object sender, RoutedEventArgs e)
     {
-        if (_engine is null)
-        {
-            return;
-        }
-
-        _engine.StopSound();
+        _engine?.StopSound();
+        UpdateTimeline();
         AppendLog("Sound stopped.");
+    }
+
+    private void OnPauseResumeSoundClick(object sender, RoutedEventArgs e)
+    {
+        if (_engine is null) return;
+        var paused = _engine.ToggleSoundPause();
+        PauseResumeButton.Content = paused ? "Resume" : "Pause";
+        AppendLog(paused ? "Sound paused." : "Sound resumed.");
+    }
+
+    private void OnPreviousSoundClick(object sender, RoutedEventArgs e)
+    {
+        SelectRelativeSound(-1, play: true);
+    }
+
+    private void OnNextSoundClick(object sender, RoutedEventArgs e)
+    {
+        SelectRelativeSound(1, play: true);
+    }
+
+    private void SelectRelativeSound(int delta, bool play)
+    {
+        var sounds = FilterSoundsForSelectedCategory().ToList();
+        if (sounds.Count == 0) return;
+
+        var index = _selectedSound is null ? -1 : sounds.FindIndex(s => s.Id == _selectedSound.Id);
+        var nextIndex = index < 0 ? 0 : (index + delta + sounds.Count) % sounds.Count;
+        _selectedSound = sounds[nextIndex];
+        _soundFilePath = _selectedSound.FilePath;
+        SoundListView.SelectedItem = _selectedSound;
+        SaveCurrentSettings();
+        if (play) PlaySelectedSound();
     }
 
     private void OnRouteSettingChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_refreshingDevices || _loadingSettings)
-        {
-            return;
-        }
-
+        if (_refreshingDevices || _loadingSettings) return;
         SaveCurrentSettings();
         ScheduleEngineRestart("audio route changed");
     }
@@ -679,44 +771,31 @@ public sealed partial class MainWindow : Window
     private void OnDelayChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateDelayLabel();
-        if (!_loadingSettings)
-        {
-            SaveCurrentSettings();
-        }
+        if (!_loadingSettings) SaveCurrentSettings();
     }
 
     private void OnSoundVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateSoundVolumeLabels();
-        if (_loadingSettings)
-        {
-            return;
-        }
+        if (_loadingSettings) return;
 
         SaveCurrentSettings();
         if (_engine is not null)
         {
             _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
-            AppendLog("SoundBoard route volumes applied live.");
         }
     }
 
     private void OnOutputVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateOutputVolumeLabels();
-        if (!_loadingSettings)
-        {
-            ApplyLiveSettings("master output volume changed");
-        }
+        if (!_loadingSettings) ApplyLiveSettings("master output volume changed");
     }
 
     private void OnVoiceSettingsChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateVoiceSettingLabels();
-        if (!_loadingSettings)
-        {
-            ApplyLiveSettings("voice setting changed");
-        }
+        if (!_loadingSettings) ApplyLiveSettings("voice setting changed");
     }
 
     private void OnToggleVoiceMonitorClick(object sender, RoutedEventArgs e)
@@ -726,13 +805,31 @@ public sealed partial class MainWindow : Window
         ApplyLiveSettings(_voiceMonitorEnabled ? "voice monitor enabled" : "voice monitor disabled");
     }
 
+    private void OnTimelineTimerTick(object? sender, object e) => UpdateTimeline();
+
+    private void UpdateTimeline()
+    {
+        var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
+        TimelineSlider.Maximum = Math.Max(1, status.DurationSeconds);
+        TimelineSlider.Value = Math.Min(TimelineSlider.Maximum, Math.Max(0, status.CurrentSeconds));
+        CurrentTimeTextBlock.Text = FormatTime(status.CurrentSeconds);
+        TotalTimeTextBlock.Text = FormatTime(status.DurationSeconds);
+        TransportStatusTextBlock.Text = status.IsActive
+            ? (status.IsPaused ? "Paused" : "Playing")
+            : "No sound";
+        PauseResumeButton.Content = status.IsPaused ? "Resume" : "Pause";
+    }
+
+    private static string FormatTime(double seconds)
+    {
+        if (double.IsNaN(seconds) || seconds < 0) seconds = 0;
+        var span = TimeSpan.FromSeconds(seconds);
+        return span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"mm\:ss");
+    }
+
     private void UpdateVoiceMonitorButton()
     {
-        if (VoiceMonitorButton is null)
-        {
-            return;
-        }
-
+        if (VoiceMonitorButton is null) return;
         VoiceMonitorButton.Content = _voiceMonitorEnabled ? "Voice Monitor: On" : "Voice Monitor: Off";
     }
 
@@ -743,57 +840,49 @@ public sealed partial class MainWindow : Window
         UpdateOutputVolumeLabels();
         UpdateVoiceSettingLabels();
         UpdateVoiceMonitorButton();
+        UpdateBottomStats();
+        UpdateTimeline();
     }
 
     private void UpdateDelayLabel()
     {
-        if (DelayLabel is null || SoundVirtualDelaySlider is null)
-        {
-            return;
-        }
-
+        if (DelayLabel is null || SoundVirtualDelaySlider is null) return;
         DelayLabel.Text = $"SoundBoard Virtual Mic Delay: {(int)Math.Round(SoundVirtualDelaySlider.Value)} ms";
     }
 
     private void UpdateSoundVolumeLabels()
     {
-        if (SoundVirtualVolumeLabel is null || SoundMonitorVolumeLabel is null)
-        {
-            return;
-        }
-
+        if (SoundVirtualVolumeLabel is null || SoundMonitorVolumeLabel is null) return;
         SoundVirtualVolumeLabel.Text = $"SoundBoard → Virtual Mic: {(int)Math.Round(SoundVirtualVolumeSlider.Value * 100)}%";
         SoundMonitorVolumeLabel.Text = $"SoundBoard → Headphones: {(int)Math.Round(SoundMonitorVolumeSlider.Value * 100)}%";
     }
 
     private void UpdateOutputVolumeLabels()
     {
-        if (VirtualOutputVolumeLabel is null || VirtualOutputVolumeSlider is null)
-        {
-            return;
-        }
-
+        if (VirtualOutputVolumeLabel is null || VirtualOutputVolumeSlider is null) return;
         VirtualOutputVolumeLabel.Text = $"Virtual Mic Master: {(int)Math.Round(VirtualOutputVolumeSlider.Value * 100)}%";
     }
 
     private void UpdateVoiceSettingLabels()
     {
-        if (VoiceGainLabel is null || GateThresholdLabel is null || CompressorThresholdLabel is null)
-        {
-            return;
-        }
-
+        if (VoiceGainLabel is null || GateThresholdLabel is null || CompressorThresholdLabel is null) return;
         VoiceGainLabel.Text = $"Voice Gain: {(int)Math.Round(VoiceGainSlider.Value)} dB";
         GateThresholdLabel.Text = $"Gate Threshold: {(int)Math.Round(GateThresholdSlider.Value)} dB";
         CompressorThresholdLabel.Text = $"Compressor Threshold: {(int)Math.Round(CompressorThresholdSlider.Value)} dB";
     }
 
+    private void UpdateBottomStats()
+    {
+        if (BottomStatsTextBlock is null) return;
+        var category = CurrentCategory;
+        var soundCount = category is null ? 0 : _library.Sounds.Count(s => s.CategoryId == category.Id);
+        var usage = category?.UsageCount ?? 0;
+        BottomStatsTextBlock.Text = $"Categories: {_library.Categories.Count} | Sounds in selected category: {soundCount} | Category usage: {usage}";
+    }
+
     private void SaveCurrentSettings()
     {
-        if (_loadingSettings)
-        {
-            return;
-        }
+        if (_loadingSettings) return;
 
         var input = InputDeviceComboBox?.SelectedItem as AudioDeviceInfo;
         var virtualOutput = VirtualOutputComboBox?.SelectedItem as AudioDeviceInfo;
@@ -807,8 +896,7 @@ public sealed partial class MainWindow : Window
         _settings.MonitorOutputDeviceName = monitor?.FriendlyName;
         _settings.LastSoundFilePath = _soundFilePath;
         _settings.LastSoundId = _selectedSound?.Id;
-        _settings.LastSoundCategoryId = (CategoryComboBox?.SelectedItem as SoundBoardCategory)?.Id
-            ?? (CategoryListView?.SelectedItem as SoundBoardCategory)?.Id;
+        _settings.LastSoundCategoryId = CurrentCategory?.Id;
 
         _settings.VirtualMicMasterVolume = VirtualOutputVolumeSlider?.Value ?? 1.0;
         _settings.VoiceMonitorEnabled = _voiceMonitorEnabled;

@@ -104,6 +104,16 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
         _soundboard.Stop();
     }
 
+    public bool ToggleSoundPause()
+    {
+        return _soundboard.TogglePause();
+    }
+
+    public SoundboardStatus GetSoundStatus()
+    {
+        return _soundboard.GetStatus();
+    }
+
     public void UpdateEffectSettings(EffectSettings settings)
     {
         _settings = settings;

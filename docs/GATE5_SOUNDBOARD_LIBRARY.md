@@ -1,35 +1,36 @@
-# Gate 5 — SoundBoard Library
+# Gate 5.1 — SoundBoard Layout
 
-Goal: replace the single test sound file with a persistent SoundBoard library.
+Gate 5.1 расширяет Gate 5 до целевой структуры вкладки SoundBoard.
 
-## Data
+## Структура SoundBoard
 
-- Library file: `%LOCALAPPDATA%\VoiSe\soundboard.json`
-- Copied sound files: `%LOCALAPPDATA%\VoiSe\sounds`
-- User settings still live in `%LOCALAPPDATA%\VoiSe\settings.json`
+### Head
 
-## Entities
+- 5 transport-кнопок: Previous, Play, Pause/Resume, Stop, Next.
+- Timeline текущего звука.
+- Текущее время слева и общая длина справа.
+- Слайдеры громкости soundboard в виртуальный микрофон и в наушники.
 
-### Category
+### Body
 
-- `id`
-- `name`
-- `sortOrder`
+- Кнопки управления категориями: создать, переименовать, удалить.
+- Кнопки управления треками: добавить, удалить.
+- Выпадающий список категорий.
+- Список треков выбранной категории.
+- Контекстное меню трека по правому клику.
 
-### Sound
+### Bottom
 
-- `id`
-- `name`
-- `categoryId`
-- `filePath`
-- `originalFileName`
-- `extension`
-- `createdAtUtc`
-- `updatedAtUtc`
+- Количество категорий.
+- Количество звуков в выбранной категории.
+- Счётчик использования звуков выбранной категории.
 
-## MVP behavior
+## Перенос настроек
 
-- Files are copied into the VoiSe data folder.
-- Supported formats: WAV / MP3 / OGG.
-- A selected sound can be played through the already-proven unified mixer.
-- Category and selected sound are restored on app restart.
+`SoundBoard Virtual Mic Delay` перенесён в Settings.
+
+## Ограничения
+
+- Hotkey пока сохраняется как текстовая метка, но ещё не подключён как глобальная горячая клавиша.
+- Timeline пока только отображает прогресс и не перематывает звук.
+- Delete Category удаляет категорию и её треки из библиотеки Gate 5.1.

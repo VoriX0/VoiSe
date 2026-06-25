@@ -138,6 +138,96 @@ public sealed class SoundBoardLibraryStore
         }
     }
 
+    public void RenameCategory(SoundBoardLibrary library, SoundBoardCategory category, string newName)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(newName) ? category.Name : newName.Trim();
+        category.Name = trimmed;
+        Save(library);
+    }
+
+    public void DeleteCategory(SoundBoardLibrary library, SoundBoardCategory category, bool deleteFiles)
+    {
+        if (category.Id == "default" && library.Categories.Count == 1)
+        {
+            throw new InvalidOperationException("The last category cannot be deleted.");
+        }
+
+        var sounds = library.Sounds.Where(s => s.CategoryId == category.Id).ToList();
+        foreach (var sound in sounds)
+        {
+            DeleteSound(library, sound, deleteFiles);
+        }
+
+        library.Categories.RemoveAll(c => c.Id == category.Id);
+        EnsureDefaultCategory(library);
+        Save(library);
+    }
+
+    public void RenameSound(SoundBoardLibrary library, SoundBoardSound sound, string newName)
+    {
+        sound.Name = string.IsNullOrWhiteSpace(newName) ? sound.DisplayName : newName.Trim();
+        sound.UpdatedAtUtc = DateTime.UtcNow;
+        Save(library);
+    }
+
+    public void SetHotkey(SoundBoardLibrary library, SoundBoardSound sound, string? hotkey)
+    {
+        sound.Hotkey = string.IsNullOrWhiteSpace(hotkey) ? null : hotkey.Trim();
+        sound.UpdatedAtUtc = DateTime.UtcNow;
+        Save(library);
+    }
+
+    public void ReplaceSoundFile(SoundBoardLibrary library, SoundBoardSound sound, string sourcePath)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException("Sound file not found.", sourcePath);
+        }
+
+        var extension = Path.GetExtension(sourcePath).ToLowerInvariant();
+        if (!SupportedExtensions.Contains(extension))
+        {
+            throw new InvalidOperationException("Unsupported sound format. Use WAV, MP3, or OGG.");
+        }
+
+        Directory.CreateDirectory(SoundsDirectory);
+        var sourceName = Path.GetFileNameWithoutExtension(sourcePath);
+        var safeName = MakeSafeFileName(sourceName);
+        var targetFileName = $"{safeName}_{sound.Id[..8]}{extension}";
+        var targetPath = Path.Combine(SoundsDirectory, targetFileName);
+
+        if (!string.Equals(sound.FilePath, targetPath, StringComparison.OrdinalIgnoreCase) && File.Exists(sound.FilePath))
+        {
+            try
+            {
+                File.Delete(sound.FilePath);
+            }
+            catch (Exception ex)
+            {
+                StartupLog.Write("Old sound file delete error: " + ex);
+            }
+        }
+
+        File.Copy(sourcePath, targetPath, overwrite: true);
+        sound.FilePath = targetPath;
+        sound.OriginalFileName = Path.GetFileName(sourcePath);
+        sound.Extension = extension;
+        sound.UpdatedAtUtc = DateTime.UtcNow;
+        Save(library);
+    }
+
+    public void IncrementUsage(SoundBoardLibrary library, SoundBoardSound sound)
+    {
+        sound.UsageCount++;
+        var category = library.Categories.FirstOrDefault(c => c.Id == sound.CategoryId);
+        if (category is not null)
+        {
+            category.UsageCount++;
+        }
+
+        Save(library);
+    }
+
     private static SoundBoardLibrary CreateDefaultLibrary()
     {
         var library = new SoundBoardLibrary();
