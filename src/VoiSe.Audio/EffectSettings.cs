@@ -12,7 +12,10 @@ public sealed class EffectSettings
     public bool LimiterEnabled { get; set; } = true;
     public float LimiterCeilingDb { get; set; } = -1.0f;
 
-    // Master output gains. These are route-level gains for the whole mixed signal.
+    // Master output gain for the final virtual microphone mix.
     public float VirtualOutputGain { get; set; } = 1.0f;
-    public float MonitorOutputGain { get; set; } = 1.0f;
+
+    // Voice monitoring is independent from SoundBoard monitoring.
+    // 0 = do not hear own processed voice in headphones, 1 = full voice monitor.
+    public float VoiceMonitorGain { get; set; } = 0.0f;
 }

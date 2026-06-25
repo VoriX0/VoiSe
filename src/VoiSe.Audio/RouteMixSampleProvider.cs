@@ -11,7 +11,8 @@ internal sealed class RouteMixSampleProvider : ISampleProvider
     private readonly object _settingsSync = new();
     private bool _limiterEnabled;
     private float _limiterCeiling;
-    private float _routeGain;
+    private float _virtualMasterGain;
+    private float _voiceMonitorGain;
     private float[] _micScratch = Array.Empty<float>();
     private float[] _soundScratch = Array.Empty<float>();
 
@@ -37,9 +38,8 @@ internal sealed class RouteMixSampleProvider : ISampleProvider
         {
             _limiterEnabled = settings.LimiterEnabled;
             _limiterCeiling = settings.LimiterEnabled ? Decibels.DbToLinear(settings.LimiterCeilingDb) : 1.0f;
-            _routeGain = _route == AudioRoute.VirtualMicrophone
-                ? Math.Clamp(settings.VirtualOutputGain, 0.0f, 2.0f)
-                : Math.Clamp(settings.MonitorOutputGain, 0.0f, 2.0f);
+            _virtualMasterGain = Math.Clamp(settings.VirtualOutputGain, 0.0f, 2.0f);
+            _voiceMonitorGain = Math.Clamp(settings.VoiceMonitorGain, 0.0f, 1.0f);
         }
     }
 
@@ -52,17 +52,22 @@ internal sealed class RouteMixSampleProvider : ISampleProvider
 
         bool limiterEnabled;
         float limiterCeiling;
-        float routeGain;
+        float virtualMasterGain;
+        float voiceMonitorGain;
         lock (_settingsSync)
         {
             limiterEnabled = _limiterEnabled;
             limiterCeiling = _limiterCeiling;
-            routeGain = _routeGain;
+            virtualMasterGain = _virtualMasterGain;
+            voiceMonitorGain = _voiceMonitorGain;
         }
 
         for (var i = 0; i < count; i++)
         {
-            var mixed = (_micScratch[i] + _soundScratch[i]) * routeGain;
+            var mixed = _route == AudioRoute.VirtualMicrophone
+                ? (_micScratch[i] + _soundScratch[i]) * virtualMasterGain
+                : (_micScratch[i] * voiceMonitorGain) + _soundScratch[i];
+
             buffer[offset + i] = limiterEnabled
                 ? Math.Clamp(mixed, -limiterCeiling, limiterCeiling)
                 : Math.Clamp(mixed, -1.0f, 1.0f);

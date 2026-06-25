@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private bool _refreshingDevices;
     private bool _manualStopRequested;
     private string _pendingRestartReason = "settings changed";
+    private bool _voiceMonitorEnabled;
 
     public MainWindow()
     {
@@ -34,7 +35,7 @@ public sealed partial class MainWindow : Window
         _routeRestartTimer.Tick += OnRouteRestartTimerTick;
 
         UpdateAllLabels();
-        AppendLog("Gate 3.5 UI started.");
+        AppendLog("Gate 3.6 UI started.");
         StartupLog.Write("MainWindow initialized; loading devices next.");
 
         DispatcherQueue.TryEnqueue(() =>
@@ -258,7 +259,6 @@ public sealed partial class MainWindow : Window
         }
 
         _engine.UpdateEffectSettings(CreateEffectSettings());
-        _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
         AppendLog($"Live settings applied: {reason}.");
     }
 
@@ -274,7 +274,7 @@ public sealed partial class MainWindow : Window
             LimiterEnabled = true,
             LimiterCeilingDb = -1.0f,
             VirtualOutputGain = (float)VirtualOutputVolumeSlider.Value,
-            MonitorOutputGain = (float)MonitorOutputVolumeSlider.Value
+            VoiceMonitorGain = _voiceMonitorEnabled ? 1.0f : 0.0f
         };
     }
 
@@ -354,12 +354,31 @@ public sealed partial class MainWindow : Window
         ApplyLiveSettings("voice setting changed");
     }
 
+
+    private void OnToggleVoiceMonitorClick(object sender, RoutedEventArgs e)
+    {
+        _voiceMonitorEnabled = !_voiceMonitorEnabled;
+        UpdateVoiceMonitorButton();
+        ApplyLiveSettings(_voiceMonitorEnabled ? "voice monitor enabled" : "voice monitor disabled");
+    }
+
+    private void UpdateVoiceMonitorButton()
+    {
+        if (VoiceMonitorButton is null)
+        {
+            return;
+        }
+
+        VoiceMonitorButton.Content = _voiceMonitorEnabled ? "Voice Monitor: On" : "Voice Monitor: Off";
+    }
+
     private void UpdateAllLabels()
     {
         UpdateDelayLabel();
         UpdateSoundVolumeLabels();
         UpdateOutputVolumeLabels();
         UpdateVoiceSettingLabels();
+        UpdateVoiceMonitorButton();
     }
 
     private void UpdateDelayLabel()
@@ -385,13 +404,12 @@ public sealed partial class MainWindow : Window
 
     private void UpdateOutputVolumeLabels()
     {
-        if (VirtualOutputVolumeLabel is null || MonitorOutputVolumeLabel is null)
+        if (VirtualOutputVolumeLabel is null || VirtualOutputVolumeSlider is null)
         {
             return;
         }
 
         VirtualOutputVolumeLabel.Text = $"Virtual Mic Master: {(int)Math.Round(VirtualOutputVolumeSlider.Value * 100)}%";
-        MonitorOutputVolumeLabel.Text = $"Monitor Master: {(int)Math.Round(MonitorOutputVolumeSlider.Value * 100)}%";
     }
 
     private void UpdateVoiceSettingLabels()
