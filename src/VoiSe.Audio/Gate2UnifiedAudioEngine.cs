@@ -9,7 +9,7 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
     private readonly MMDevice _inputDevice;
     private readonly MMDevice _virtualOutputDevice;
     private readonly MMDevice? _monitorDevice;
-    private readonly EffectSettings _settings;
+    private EffectSettings _settings;
     private readonly WaveFormat _mixFormat;
 
     private readonly FloatSampleQueue _virtualMicQueue;
@@ -20,6 +20,8 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
     private WasapiOut? _virtualOutput;
     private WasapiOut? _monitorOutput;
     private SimpleVoiceProcessor? _processor;
+    private RouteMixSampleProvider? _virtualProvider;
+    private RouteMixSampleProvider? _monitorProvider;
     private bool _disposed;
 
     public Gate2UnifiedAudioEngine(
@@ -64,7 +66,7 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
 
         _processor = new SimpleVoiceProcessor(_settings);
 
-        var virtualProvider = new RouteMixSampleProvider(
+        _virtualProvider = new RouteMixSampleProvider(
             _mixFormat,
             AudioRoute.VirtualMicrophone,
             _virtualMicQueue,
@@ -72,12 +74,12 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
             _settings);
 
         _virtualOutput = new WasapiOut(_virtualOutputDevice, AudioClientShareMode.Shared, true, 50);
-        _virtualOutput.Init(new SampleToWaveProvider(virtualProvider));
+        _virtualOutput.Init(new SampleToWaveProvider(_virtualProvider));
         _virtualOutput.Play();
 
         if (_monitorDevice is not null)
         {
-            var monitorProvider = new RouteMixSampleProvider(
+            _monitorProvider = new RouteMixSampleProvider(
                 _mixFormat,
                 AudioRoute.Monitor,
                 _monitorMicQueue,
@@ -85,7 +87,7 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
                 _settings);
 
             _monitorOutput = new WasapiOut(_monitorDevice, AudioClientShareMode.Shared, true, 50);
-            _monitorOutput.Init(new SampleToWaveProvider(monitorProvider));
+            _monitorOutput.Init(new SampleToWaveProvider(_monitorProvider));
             _monitorOutput.Play();
         }
 
@@ -100,6 +102,19 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
     public void StopSound()
     {
         _soundboard.Stop();
+    }
+
+    public void UpdateEffectSettings(EffectSettings settings)
+    {
+        _settings = settings;
+        _processor?.UpdateSettings(settings);
+        _virtualProvider?.UpdateSettings(settings);
+        _monitorProvider?.UpdateSettings(settings);
+    }
+
+    public void UpdateSoundVolumes(float virtualVolume, float monitorVolume)
+    {
+        _soundboard.UpdateVolumes(virtualVolume, monitorVolume);
     }
 
     public void Stop()

@@ -14,21 +14,29 @@ namespace VoiSe.App;
 public sealed partial class MainWindow : Window
 {
     private readonly AudioDeviceCatalog _catalog = new();
+    private readonly DispatcherTimer _routeRestartTimer;
     private Gate2UnifiedAudioEngine? _engine;
     private string? _soundFilePath;
+    private bool _refreshingDevices;
+    private bool _manualStopRequested;
+    private string _pendingRestartReason = "settings changed";
 
     public MainWindow()
     {
         StartupLog.Write("MainWindow constructor started.");
         InitializeComponent();
         Closed += OnClosed;
-        UpdateDelayLabel();
-        UpdateSoundVolumeLabels();
-        UpdateVoiceSettingLabels();
-        AppendLog("Gate 3.2 UI started.");
+
+        _routeRestartTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(450)
+        };
+        _routeRestartTimer.Tick += OnRouteRestartTimerTick;
+
+        UpdateAllLabels();
+        AppendLog("Gate 3.5 UI started.");
         StartupLog.Write("MainWindow initialized; loading devices next.");
 
-        // Load devices after the visual tree exists, so startup problems are visible in the UI/log.
         DispatcherQueue.TryEnqueue(() =>
         {
             try
@@ -45,7 +53,8 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
-        StopEngine();
+        _manualStopRequested = true;
+        StopEngine(log: false);
         _catalog.Dispose();
     }
 
@@ -64,23 +73,40 @@ public sealed partial class MainWindow : Window
 
     private void RefreshDevices()
     {
-        var captureDevices = _catalog.ListCaptureDevices();
-        var renderDevices = _catalog.ListRenderDevices();
+        _refreshingDevices = true;
+        try
+        {
+            var captureDevices = _catalog.ListCaptureDevices();
+            var renderDevices = _catalog.ListRenderDevices();
 
-        InputDeviceComboBox.ItemsSource = captureDevices;
-        VirtualOutputComboBox.ItemsSource = renderDevices;
-        MonitorOutputComboBox.ItemsSource = renderDevices;
+            var oldInputId = (InputDeviceComboBox.SelectedItem as AudioDeviceInfo)?.Id;
+            var oldVirtualId = (VirtualOutputComboBox.SelectedItem as AudioDeviceInfo)?.Id;
+            var oldMonitorId = (MonitorOutputComboBox.SelectedItem as AudioDeviceInfo)?.Id;
 
-        InputDeviceComboBox.SelectedItem = PickByName(captureDevices, "Fifine") ?? captureDevices.FirstOrDefault();
-        VirtualOutputComboBox.SelectedItem = PickByName(renderDevices, "CABLE Input") ?? renderDevices.FirstOrDefault();
-        MonitorOutputComboBox.SelectedItem = PickByName(renderDevices, "Realtek") ?? renderDevices.FirstOrDefault();
+            InputDeviceComboBox.ItemsSource = captureDevices;
+            VirtualOutputComboBox.ItemsSource = renderDevices;
+            MonitorOutputComboBox.ItemsSource = renderDevices;
 
-        AppendLog($"Devices refreshed: {captureDevices.Count} capture, {renderDevices.Count} render.");
+            InputDeviceComboBox.SelectedItem = PickById(captureDevices, oldInputId) ?? PickByName(captureDevices, "Fifine") ?? captureDevices.FirstOrDefault();
+            VirtualOutputComboBox.SelectedItem = PickById(renderDevices, oldVirtualId) ?? PickByName(renderDevices, "CABLE Input") ?? renderDevices.FirstOrDefault();
+            MonitorOutputComboBox.SelectedItem = PickById(renderDevices, oldMonitorId) ?? PickByName(renderDevices, "Realtek") ?? renderDevices.FirstOrDefault();
+
+            AppendLog($"Devices refreshed: {captureDevices.Count} capture, {renderDevices.Count} render.");
+        }
+        finally
+        {
+            _refreshingDevices = false;
+        }
     }
 
     private static AudioDeviceInfo? PickByName(IReadOnlyList<AudioDeviceInfo> devices, string text)
     {
         return devices.FirstOrDefault(d => d.FriendlyName.Contains(text, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static AudioDeviceInfo? PickById(IReadOnlyList<AudioDeviceInfo> devices, string? id)
+    {
+        return id is null ? null : devices.FirstOrDefault(d => d.Id == id);
     }
 
     private async void OnBrowseSoundClick(object sender, RoutedEventArgs e)
@@ -104,10 +130,25 @@ public sealed partial class MainWindow : Window
 
     private void OnStartEngineClick(object sender, RoutedEventArgs e)
     {
+        _manualStopRequested = false;
+        StartEngine(logAlreadyRunning: true);
+    }
+
+    private void OnStopEngineClick(object sender, RoutedEventArgs e)
+    {
+        _manualStopRequested = true;
+        StopEngine(log: true);
+    }
+
+    private bool StartEngine(bool logAlreadyRunning)
+    {
         if (_engine is not null)
         {
-            AppendLog("Engine is already running.");
-            return;
+            if (logAlreadyRunning)
+            {
+                AppendLog("Engine is already running.");
+            }
+            return true;
         }
 
         var inputInfo = InputDeviceComboBox.SelectedItem as AudioDeviceInfo;
@@ -117,7 +158,7 @@ public sealed partial class MainWindow : Window
         if (inputInfo is null || virtualInfo is null)
         {
             AppendLog("Select input microphone and virtual output first.");
-            return;
+            return false;
         }
 
         var input = _catalog.FindCaptureDevice(inputInfo.Id);
@@ -127,28 +168,18 @@ public sealed partial class MainWindow : Window
         if (input is null || virtualOutput is null)
         {
             AppendLog("Selected devices are not available anymore. Refresh devices and try again.");
-            return;
+            return false;
         }
-
-        var settings = new EffectSettings
-        {
-            VoiceGainDb = (float)VoiceGainSlider.Value,
-            GateThresholdDb = (float)GateThresholdSlider.Value,
-            CompressorThresholdDb = (float)CompressorThresholdSlider.Value,
-            GateEnabled = true,
-            CompressorEnabled = true,
-            LimiterEnabled = true,
-            LimiterCeilingDb = -1.0f
-        };
 
         try
         {
-            _engine = new Gate2UnifiedAudioEngine(input, virtualOutput, monitor, settings);
+            _engine = new Gate2UnifiedAudioEngine(input, virtualOutput, monitor, CreateEffectSettings());
             _engine.Start();
             EngineStatusTextBlock.Text = "Running";
             AppendLog($"Engine started. Input: {input.FriendlyName}");
             AppendLog($"Virtual output: {virtualOutput.FriendlyName}");
             AppendLog($"Monitor: {(monitor is null ? "disabled" : monitor.FriendlyName)}");
+            return true;
         }
         catch (Exception ex)
         {
@@ -156,15 +187,11 @@ public sealed partial class MainWindow : Window
             _engine = null;
             EngineStatusTextBlock.Text = "Error";
             AppendLog($"Engine start error: {ex.Message}");
+            return false;
         }
     }
 
-    private void OnStopEngineClick(object sender, RoutedEventArgs e)
-    {
-        StopEngine();
-    }
-
-    private void StopEngine()
+    private void StopEngine(bool log)
     {
         if (_engine is null)
         {
@@ -174,7 +201,10 @@ public sealed partial class MainWindow : Window
         try
         {
             _engine.Dispose();
-            AppendLog("Engine stopped.");
+            if (log)
+            {
+                AppendLog("Engine stopped.");
+            }
         }
         catch (Exception ex)
         {
@@ -185,6 +215,67 @@ public sealed partial class MainWindow : Window
             _engine = null;
             EngineStatusTextBlock.Text = "Stopped";
         }
+    }
+
+    private void RestartEngine(string reason)
+    {
+        if (_engine is null || _manualStopRequested)
+        {
+            return;
+        }
+
+        AppendLog($"Engine auto-restart: {reason}.");
+        StopEngine(log: false);
+        StartEngine(logAlreadyRunning: false);
+    }
+
+    private void OnRouteRestartTimerTick(object? sender, object e)
+    {
+        _routeRestartTimer.Stop();
+        RestartEngine(_pendingRestartReason);
+    }
+
+    private void ScheduleEngineRestart(string reason)
+    {
+        if (_engine is null || _refreshingDevices)
+        {
+            return;
+        }
+
+        _pendingRestartReason = reason;
+        _routeRestartTimer.Stop();
+        _routeRestartTimer.Start();
+        EngineStatusTextBlock.Text = "Restart pending";
+    }
+
+    private void ApplyLiveSettings(string reason)
+    {
+        UpdateAllLabels();
+
+        if (_engine is null)
+        {
+            return;
+        }
+
+        _engine.UpdateEffectSettings(CreateEffectSettings());
+        _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
+        AppendLog($"Live settings applied: {reason}.");
+    }
+
+    private EffectSettings CreateEffectSettings()
+    {
+        return new EffectSettings
+        {
+            VoiceGainDb = (float)VoiceGainSlider.Value,
+            GateThresholdDb = (float)GateThresholdSlider.Value,
+            CompressorThresholdDb = (float)CompressorThresholdSlider.Value,
+            GateEnabled = true,
+            CompressorEnabled = true,
+            LimiterEnabled = true,
+            LimiterCeilingDb = -1.0f,
+            VirtualOutputGain = (float)VirtualOutputVolumeSlider.Value,
+            MonitorOutputGain = (float)MonitorOutputVolumeSlider.Value
+        };
     }
 
     private void OnPlaySoundClick(object sender, RoutedEventArgs e)
@@ -226,6 +317,16 @@ public sealed partial class MainWindow : Window
         AppendLog("Sound stopped.");
     }
 
+    private void OnRouteSettingChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshingDevices)
+        {
+            return;
+        }
+
+        ScheduleEngineRestart("audio route changed");
+    }
+
     private void OnDelayChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateDelayLabel();
@@ -234,10 +335,30 @@ public sealed partial class MainWindow : Window
     private void OnSoundVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
         UpdateSoundVolumeLabels();
+        if (_engine is not null)
+        {
+            _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
+            AppendLog("SoundBoard route volumes applied live.");
+        }
+    }
+
+    private void OnOutputVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        UpdateOutputVolumeLabels();
+        ApplyLiveSettings("master output volume changed");
     }
 
     private void OnVoiceSettingsChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
+        UpdateVoiceSettingLabels();
+        ApplyLiveSettings("voice setting changed");
+    }
+
+    private void UpdateAllLabels()
+    {
+        UpdateDelayLabel();
+        UpdateSoundVolumeLabels();
+        UpdateOutputVolumeLabels();
         UpdateVoiceSettingLabels();
     }
 
@@ -248,7 +369,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        DelayLabel.Text = $"Virtual Mic Delay: {(int)Math.Round(SoundVirtualDelaySlider.Value)} ms";
+        DelayLabel.Text = $"SoundBoard Virtual Mic Delay: {(int)Math.Round(SoundVirtualDelaySlider.Value)} ms";
     }
 
     private void UpdateSoundVolumeLabels()
@@ -258,8 +379,19 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        SoundVirtualVolumeLabel.Text = $"Sound → Virtual Mic: {(int)Math.Round(SoundVirtualVolumeSlider.Value * 100)}%";
-        SoundMonitorVolumeLabel.Text = $"Sound → Monitor: {(int)Math.Round(SoundMonitorVolumeSlider.Value * 100)}%";
+        SoundVirtualVolumeLabel.Text = $"SoundBoard → Virtual Mic: {(int)Math.Round(SoundVirtualVolumeSlider.Value * 100)}%";
+        SoundMonitorVolumeLabel.Text = $"SoundBoard → Monitor: {(int)Math.Round(SoundMonitorVolumeSlider.Value * 100)}%";
+    }
+
+    private void UpdateOutputVolumeLabels()
+    {
+        if (VirtualOutputVolumeLabel is null || MonitorOutputVolumeLabel is null)
+        {
+            return;
+        }
+
+        VirtualOutputVolumeLabel.Text = $"Virtual Mic Master: {(int)Math.Round(VirtualOutputVolumeSlider.Value * 100)}%";
+        MonitorOutputVolumeLabel.Text = $"Monitor Master: {(int)Math.Round(MonitorOutputVolumeSlider.Value * 100)}%";
     }
 
     private void UpdateVoiceSettingLabels()

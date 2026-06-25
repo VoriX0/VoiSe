@@ -2,44 +2,67 @@ namespace VoiSe.Audio;
 
 public sealed class SimpleVoiceProcessor
 {
-    private readonly EffectSettings _settings;
-    private readonly float _gateThreshold;
-    private readonly float _compressorThreshold;
-    private readonly float _inputGain;
-    private readonly float _voiceGain;
-    private readonly float _limiterCeiling;
+    private readonly object _sync = new();
+    private EffectSettings _settings;
+    private float _gateThreshold;
+    private float _compressorThreshold;
+    private float _inputGain;
+    private float _voiceGain;
+    private float _limiterCeiling;
 
     public SimpleVoiceProcessor(EffectSettings settings)
     {
         _settings = settings;
-        _gateThreshold = Decibels.DbToLinear(settings.GateThresholdDb);
-        _compressorThreshold = Decibels.DbToLinear(settings.CompressorThresholdDb);
-        _inputGain = Decibels.DbToLinear(settings.InputGainDb);
-        _voiceGain = Decibels.DbToLinear(settings.VoiceGainDb);
-        _limiterCeiling = Decibels.DbToLinear(settings.LimiterCeilingDb);
+        Recalculate(settings);
+    }
+
+    public void UpdateSettings(EffectSettings settings)
+    {
+        lock (_sync)
+        {
+            _settings = settings;
+            Recalculate(settings);
+        }
     }
 
     public void ProcessInPlace(Span<float> samples)
     {
+        EffectSettings settings;
+        float gateThreshold;
+        float compressorThreshold;
+        float inputGain;
+        float voiceGain;
+        float limiterCeiling;
+
+        lock (_sync)
+        {
+            settings = _settings;
+            gateThreshold = _gateThreshold;
+            compressorThreshold = _compressorThreshold;
+            inputGain = _inputGain;
+            voiceGain = _voiceGain;
+            limiterCeiling = _limiterCeiling;
+        }
+
         for (var i = 0; i < samples.Length; i++)
         {
-            var sample = samples[i] * _inputGain;
+            var sample = samples[i] * inputGain;
 
-            if (_settings.GateEnabled && Math.Abs(sample) < _gateThreshold)
+            if (settings.GateEnabled && Math.Abs(sample) < gateThreshold)
             {
                 sample = 0.0f;
             }
 
-            if (_settings.CompressorEnabled)
+            if (settings.CompressorEnabled)
             {
-                sample = CompressSample(sample);
+                sample = CompressSample(sample, compressorThreshold, settings.CompressorRatio);
             }
 
-            sample *= _voiceGain;
+            sample *= voiceGain;
 
-            if (_settings.LimiterEnabled)
+            if (settings.LimiterEnabled)
             {
-                sample = Math.Clamp(sample, -_limiterCeiling, _limiterCeiling);
+                sample = Math.Clamp(sample, -limiterCeiling, limiterCeiling);
             }
             else
             {
@@ -50,17 +73,26 @@ public sealed class SimpleVoiceProcessor
         }
     }
 
-    private float CompressSample(float sample)
+    private void Recalculate(EffectSettings settings)
+    {
+        _gateThreshold = Decibels.DbToLinear(settings.GateThresholdDb);
+        _compressorThreshold = Decibels.DbToLinear(settings.CompressorThresholdDb);
+        _inputGain = Decibels.DbToLinear(settings.InputGainDb);
+        _voiceGain = Decibels.DbToLinear(settings.VoiceGainDb);
+        _limiterCeiling = Decibels.DbToLinear(settings.LimiterCeilingDb);
+    }
+
+    private static float CompressSample(float sample, float compressorThreshold, float compressorRatio)
     {
         var abs = Math.Abs(sample);
-        if (abs <= _compressorThreshold)
+        if (abs <= compressorThreshold)
         {
             return sample;
         }
 
         var sign = Math.Sign(sample);
-        var excess = abs - _compressorThreshold;
-        var compressed = _compressorThreshold + excess / Math.Max(1.0f, _settings.CompressorRatio);
+        var excess = abs - compressorThreshold;
+        var compressed = compressorThreshold + excess / Math.Max(1.0f, compressorRatio);
         return sign * compressed;
     }
 }

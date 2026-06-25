@@ -1,1 +1,1 @@
-VoiSe Gate 3.4 - WinUI startup fixed
+VoiSe Gate 3.5 - WinUI live settings and Settings mixer controls

@@ -47,6 +47,16 @@ public sealed class SoundboardTransport
         }
     }
 
+    public void UpdateVolumes(float virtualVolume, float monitorVolume)
+    {
+        lock (_sync)
+        {
+            _active?.UpdateVolumes(
+                Math.Clamp(virtualVolume, 0.0f, 2.0f),
+                Math.Clamp(monitorVolume, 0.0f, 2.0f));
+        }
+    }
+
     public int Read(AudioRoute route, float[] buffer, int offset, int count)
     {
         lock (_sync)
@@ -70,8 +80,8 @@ public sealed class SoundboardTransport
     private sealed class ActiveSound
     {
         private readonly float[] _samples;
-        private readonly float _virtualVolume;
-        private readonly float _monitorVolume;
+        private float _virtualVolume;
+        private float _monitorVolume;
         private int _virtualPosition;
         private int _monitorPosition;
         private int _remainingVirtualDelaySamples;
@@ -87,6 +97,12 @@ public sealed class SoundboardTransport
         }
 
         public bool IsFinished => _virtualFinished && _monitorFinished;
+
+        public void UpdateVolumes(float virtualVolume, float monitorVolume)
+        {
+            _virtualVolume = virtualVolume;
+            _monitorVolume = monitorVolume;
+        }
 
         public int Read(AudioRoute route, float[] buffer, int offset, int count)
         {
