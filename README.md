@@ -1,6 +1,6 @@
-# VoiSe Gate 6.6 — Centered SoundBoard Wheel Zone
+# VoiSe Gate 6.7 — Shifted SoundBoard Wheel Zone
 
-Gate 6.6 keeps the Gate 6.5 Voice Changer / Pitch work and changes only the SoundBoard wheel catch-zone calibration.
+Gate 6.7 keeps the Gate 6.5/6.6 Voice Changer / Pitch work and changes only the SoundBoard wheel catch-zone calibration.
 
 ## Run
 
@@ -47,7 +47,7 @@ The SoundBoard wheel catch-zone was expanded again:
 
 ## Presets
 
-New and recreated presets save all active Gate 6.6 sliders as separate JSON files in:
+New and recreated presets save all active Gate 6.7 sliders as separate JSON files in:
 
 ```powershell
 %LOCALAPPDATA%\VoiSe\presets\
@@ -56,6 +56,6 @@ New and recreated presets save all active Gate 6.6 sliders as separate JSON file
 Existing older presets still load; removed keys are ignored.
 
 
-## Gate 6.6 change
+## Gate 6.7 change
 
-The SoundBoard wheel catch-zone is now centered on the whole application window and clipped so it starts below the tab selector. When the SoundBoard tab is active, scrolling anywhere below the tabs should scroll only the Sounds list.
+The SoundBoard wheel catch-zone is still oversized, but its center is shifted left by 40% of the window width and down by 30% of the window height. The zone is still clipped so it does not start above the tab selector. When the SoundBoard tab is active, scrolling inside that calibrated zone scrolls only the Sounds list.

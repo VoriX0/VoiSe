@@ -53,6 +53,8 @@ public sealed partial class MainWindow : Window
     private const int WmMouseWheel = 0x020A;
     private const double SoundWheelZoneWidthRatio = 3.00;
     private const double SoundWheelZoneHeightRatio = 3.00;
+    private const double SoundWheelZoneCenterOffsetXRatio = -0.40;
+    private const double SoundWheelZoneCenterOffsetYRatio = 0.30;
     private const double VoiceValueMin = -9999.0;
     private const double VoiceValueMax = 9999.0;
 
@@ -90,7 +92,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.6 UI started.");
+        AppendLog("Gate 6.7 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -112,21 +114,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.6 restore started.");
+            StartupLog.Write("Gate 6.7 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.6 scalar settings applied.");
+            StartupLog.Write("Gate 6.7 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.6 restore completed.");
+            StartupLog.Write("Gate 6.7 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.6 restore error: " + ex);
+            StartupLog.Write("Gate 6.7 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -248,18 +250,17 @@ public sealed partial class MainWindow : Window
         var clientHeight = Math.Max(1.0, clientRect.Bottom - clientRect.Top);
         var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
 
-        // Gate 6.6: the previous wheel hit-zone was visually offset from the
-        // Sounds list. Make the active wheel zone explicit, centered on the
-        // whole window, oversized, and then clipped so it never reaches above
-        // the tab content area. Result: when SoundBoard is selected, every point
-        // below the tab selector can scroll the Sounds list.
+        // Gate 6.7: keep the oversized SoundBoard wheel zone, but calibrate its
+        // center left/down from the true window center. This compensates for the
+        // observed WinUI hit-zone offset while keeping the zone clipped below
+        // the tab selector.
         var tabContentTopDip = SoundBoardTabRoot.TransformToVisual(RootGrid)
             .TransformPoint(new Windows.Foundation.Point(0, 0))
             .Y;
         var tabContentTopPx = Math.Max(0.0, tabContentTopDip * scale);
 
-        var centerX = clientWidth / 2.0;
-        var centerY = clientHeight / 2.0;
+        var centerX = clientWidth * (0.5 + SoundWheelZoneCenterOffsetXRatio);
+        var centerY = clientHeight * (0.5 + SoundWheelZoneCenterOffsetYRatio);
         var zoneWidth = clientWidth * SoundWheelZoneWidthRatio;
         var zoneHeight = clientHeight * SoundWheelZoneHeightRatio;
 
