@@ -10,6 +10,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VoiSe.Audio;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using Windows.System;
 using WinRT.Interop;
@@ -92,7 +93,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.10 UI started.");
+        AppendLog("Gate 6.11 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -114,21 +115,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.10 restore started.");
+            StartupLog.Write("Gate 6.11 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.10 scalar settings applied.");
+            StartupLog.Write("Gate 6.11 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.10 restore completed.");
+            StartupLog.Write("Gate 6.11 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.10 restore error: " + ex);
+            StartupLog.Write("Gate 6.11 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -283,7 +284,7 @@ public sealed partial class MainWindow : Window
 
     private bool IsPointInVoiceChangerWheelZone(double yDip)
     {
-        // Gate 6.10: SoundBoard worked because its wheel zone is allowed to extend
+        // Gate 6.11: SoundBoard worked because its wheel zone is allowed to extend
         // below RootGrid.ActualHeight. Voice Changer used to be clipped at
         // RootGrid.ActualHeight, which created a dead lower area in fullscreen.
         return IsPointInExtendedVerticalWheelZone(VoiceChangerScrollViewer, yDip);
@@ -291,9 +292,10 @@ public sealed partial class MainWindow : Window
 
     private bool IsPointInSettingsLogWheelZone(double yDip)
     {
-        // Same fix for Settings: route wheel events from the log top down through
-        // the extended bottom zone, matching the successful SoundBoard behavior.
-        return IsPointInExtendedVerticalWheelZone(SettingsLogArea, yDip);
+        // Gate 6.11: keep Settings log scrolling extended downward, but start the
+        // log wheel zone at the actual log TextBox. This prevents the log handler
+        // from stealing wheel events from the Settings controls above it.
+        return IsPointInExtendedVerticalWheelZone(LogTextBox, yDip);
     }
 
     private bool IsPointInExtendedVerticalWheelZone(FrameworkElement? element, double yDip)
@@ -1714,11 +1716,49 @@ public sealed partial class MainWindow : Window
         hotkeyItem.Click += async (_, _) => await EditVoicePresetHotkeysAsync(preset);
         flyout.Items.Add(hotkeyItem);
 
+        var copyJsonFileItem = new MenuFlyoutItem { Text = "Copy JSON file" };
+        copyJsonFileItem.Click += async (_, _) => await CopyVoicePresetJsonFileToClipboardAsync(preset);
+        flyout.Items.Add(copyJsonFileItem);
+
         var deleteItem = new MenuFlyoutItem { Text = "Delete" };
         deleteItem.Click += async (_, _) => await DeleteVoicePresetAsync(preset);
         flyout.Items.Add(deleteItem);
 
         return flyout;
+    }
+
+    private async Task CopyVoicePresetJsonFileToClipboardAsync(VoicePreset preset)
+    {
+        try
+        {
+            var path = preset.FilePath;
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                var refreshed = _voicePresetStore.LoadPresets()
+                    .FirstOrDefault(p => string.Equals(p.Name, preset.Name, StringComparison.CurrentCultureIgnoreCase));
+                path = refreshed?.FilePath;
+            }
+
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                AppendLog($"Voice preset JSON copy failed: file not found for {preset.Name}.");
+                return;
+            }
+
+            var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var dataPackage = new DataPackage
+            {
+                RequestedOperation = DataPackageOperation.Copy
+            };
+            dataPackage.SetStorageItems(new[] { storageFile });
+            Clipboard.SetContent(dataPackage);
+            Clipboard.Flush();
+            AppendLog($"Voice preset JSON file copied to clipboard: {System.IO.Path.GetFileName(path)}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Voice preset JSON copy error: {ex.Message}");
+        }
     }
 
     private async Task RenameVoicePresetAsync(VoicePreset preset)

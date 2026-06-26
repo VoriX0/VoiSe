@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 6.10 - Extended Voice and Settings Scroll">
+    Title="VoiSe Gate 6.11 - Settings Log and Preset Export">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 6.10" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Voice pitch shifter, extended Voice Changer and Settings log scroll" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 6.11" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="Settings log polish and preset JSON export" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -432,7 +432,7 @@
                     <Grid Padding="0,16,0,0" RowSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
-                            <RowDefinition Height="220" />
+                            <RowDefinition Height="110" />
                         </Grid.RowDefinitions>
 
                         <Border Grid.Row="0" Padding="4">
