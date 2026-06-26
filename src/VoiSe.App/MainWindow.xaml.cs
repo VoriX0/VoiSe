@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
@@ -38,6 +39,12 @@ public sealed partial class MainWindow : Window
     private double _timelineMaximumSeconds = 1.0;
     private string _trackSearchText = string.Empty;
     private List<SoundBoardSound> _visibleSounds = new();
+    private readonly SubclassProc _subclassProc;
+    private readonly IntPtr _windowHandle;
+    private string? _lastSoundRowClickSoundId;
+    private DateTime _lastSoundRowClickUtc = DateTime.MinValue;
+    private const uint WindowSubclassId = 528;
+    private const uint WmMouseWheel = 0x020A;
 
     public MainWindow()
     {
@@ -46,6 +53,9 @@ public sealed partial class MainWindow : Window
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
+        _subclassProc = WindowSubclassProc;
+        _windowHandle = WindowNative.GetWindowHandle(this);
+        SetWindowSubclass(_windowHandle, _subclassProc, new UIntPtr(WindowSubclassId), IntPtr.Zero);
         SoundBoardTabRoot.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundBoardPointerWheelChanged), true);
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         Closed += OnClosed;
@@ -64,7 +74,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.27 UI started.");
+        AppendLog("Gate 5.28 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -86,20 +96,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.27 restore started.");
+            StartupLog.Write("Gate 5.28 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.27 scalar settings applied.");
+            StartupLog.Write("Gate 5.28 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.27 restore completed.");
+            StartupLog.Write("Gate 5.28 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.27 restore error: " + ex);
+            StartupLog.Write("Gate 5.28 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -136,29 +146,67 @@ public sealed partial class MainWindow : Window
 
     private void OnMainTabSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Gate 5.27: current SoundBoard design with a custom overlay sound scroller.
+        // Gate 5.28: current SoundBoard design with global wheel routing for the custom sound scroller.
     }
 
     private void OnSoundBoardPointerWheelChanged(object sender, PointerRoutedEventArgs e)
     {
-        if (SoundOverlayScrollViewer is null)
-        {
-            return;
-        }
-
         var delta = e.GetCurrentPoint(SoundBoardTabRoot).Properties.MouseWheelDelta;
-        if (delta == 0)
+        if (delta != 0 && TryScrollSoundOverlay(delta))
         {
-            return;
+            e.Handled = true;
+        }
+    }
+
+    private bool TryScrollSoundOverlay(int wheelDelta)
+    {
+        if (SoundOverlayScrollViewer is null || wheelDelta == 0)
+        {
+            return false;
         }
 
-        // Gate 5.27: the whole SoundBoard tab acts as a wheel zone,
-        // but only the sound list scrolls. This avoids the shifted hit-test
-        // area we saw in fullscreen mode. Positive delta means wheel up.
-        var newOffset = Math.Max(0, SoundOverlayScrollViewer.VerticalOffset - delta);
-        SoundOverlayScrollViewer.ChangeView(null, newOffset, null, disableAnimation: true);
-        e.Handled = true;
+        var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
+        var step = 34.0 * notches;
+        var target = SoundOverlayScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
+        target = Math.Max(0, Math.Min(SoundOverlayScrollViewer.ScrollableHeight, target));
+        SoundOverlayScrollViewer.ChangeView(null, target, null, disableAnimation: false);
+        return true;
     }
+
+    private IntPtr WindowSubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, UIntPtr idSubclass, IntPtr refData)
+    {
+        if (msg == WmMouseWheel && TryRouteWindowMouseWheel(wParam))
+        {
+            return IntPtr.Zero;
+        }
+
+        return DefSubclassProc(hWnd, msg, wParam, lParam);
+    }
+
+    private bool TryRouteWindowMouseWheel(IntPtr wParam)
+    {
+        // Gate 5.28: bypass WinUI hit-test completely. In fullscreen mode the routed
+        // wheel zone was visually shifted, so every wheel message while the SoundBoard
+        // tab is selected is sent to the Sounds scroller.
+        if (MainTabView?.SelectedIndex != 0)
+        {
+            return false;
+        }
+
+        var delta = unchecked((short)((wParam.ToInt64() >> 16) & 0xffff));
+        return TryScrollSoundOverlay(delta);
+    }
+
+    private delegate IntPtr SubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, UIntPtr idSubclass, IntPtr refData);
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     private void UpdateBottomPanelVisibility()
     {
@@ -171,6 +219,10 @@ public sealed partial class MainWindow : Window
         SaveCurrentSettings();
         StopEngine(log: false);
         _timelineTimer.Stop();
+        if (_windowHandle != IntPtr.Zero)
+        {
+            RemoveWindowSubclass(_windowHandle, _subclassProc, new UIntPtr(WindowSubclassId));
+        }
         _catalog.Dispose();
     }
 
@@ -368,6 +420,7 @@ public sealed partial class MainWindow : Window
         };
 
         row.Child = text;
+        row.PointerPressed += OnSoundRowPointerPressed;
         row.Tapped += OnSoundRowTapped;
         row.DoubleTapped += OnSoundRowDoubleTapped;
         row.RightTapped += OnSoundRowRightTapped;
@@ -471,7 +524,7 @@ public sealed partial class MainWindow : Window
 
     private void OnSoundSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Gate 5.27: the ListView was replaced with a custom overlay scroller.
+        // Gate 5.28: the ListView was replaced with a custom overlay scroller.
     }
 
     private async void OnAddSoundClick(object sender, RoutedEventArgs e)
@@ -654,12 +707,42 @@ public sealed partial class MainWindow : Window
 
     private void OnSoundListRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
-        // Gate 5.27: kept for compatibility with older XAML packages.
+        // Gate 5.28: kept for compatibility with older XAML packages.
     }
 
     private void OnSoundListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        // Gate 5.27: kept for compatibility with older XAML packages.
+        // Gate 5.28: kept for compatibility with older XAML packages.
+    }
+
+    private void OnSoundRowPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: SoundBoardSound sound })
+        {
+            return;
+        }
+
+        var pointer = e.GetCurrentPoint((UIElement)sender);
+        if (!pointer.Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        var isDoubleClick = string.Equals(_lastSoundRowClickSoundId, sound.Id, StringComparison.Ordinal)
+            && (now - _lastSoundRowClickUtc).TotalMilliseconds <= 520;
+
+        _lastSoundRowClickSoundId = sound.Id;
+        _lastSoundRowClickUtc = now;
+
+        if (isDoubleClick)
+        {
+            SelectSound(sound);
+            PlaySelectedSound();
+            _lastSoundRowClickSoundId = null;
+            _lastSoundRowClickUtc = DateTime.MinValue;
+            e.Handled = true;
+        }
     }
 
     private void OnSoundRowTapped(object sender, TappedRoutedEventArgs e)

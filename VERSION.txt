@@ -1,1 +1,1 @@
-Gate 5.27 - SoundBoard Tab Wheel Sound Scroll
+Gate 5.28 - SoundBoard Global Wheel Fix
