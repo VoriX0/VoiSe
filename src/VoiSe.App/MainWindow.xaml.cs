@@ -91,7 +91,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.3 UI started.");
+        AppendLog("Gate 6.4 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -113,21 +113,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.3 restore started.");
+            StartupLog.Write("Gate 6.4 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.3 scalar settings applied.");
+            StartupLog.Write("Gate 6.4 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.3 restore completed.");
+            StartupLog.Write("Gate 6.4 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.3 restore error: " + ex);
+            StartupLog.Write("Gate 6.4 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -148,6 +148,7 @@ public sealed partial class MainWindow : Window
         SetVoiceControl(VoiceGainSlider, VoiceGainValueBox, _settings.VoiceGain);
         SetVoiceControl(GateThresholdSlider, GateThresholdValueBox, _settings.VoiceGate);
         SetVoiceControl(CompressorThresholdSlider, CompressorThresholdValueBox, _settings.VoiceCompressor);
+        SetVoiceControl(TimbreSlider, TimbreValueBox, _settings.VoiceTimbre);
         SetVoiceControl(BassSlider, BassValueBox, _settings.VoiceBass);
         SetVoiceControl(TrebleSlider, TrebleValueBox, _settings.VoiceTreble);
         SetVoiceControl(DistortionSlider, DistortionValueBox, _settings.VoiceDistortion);
@@ -157,6 +158,8 @@ public sealed partial class MainWindow : Window
         SetVoiceControl(ReverbSlider, ReverbValueBox, _settings.VoiceReverb);
         SetVoiceControl(RadioSlider, RadioValueBox, _settings.VoiceRadio);
         SetVoiceControl(BitCrusherSlider, BitCrusherValueBox, _settings.VoiceBitCrusher);
+        SetVoiceControl(ChorusSlider, ChorusValueBox, _settings.VoiceChorus);
+        SetVoiceControl(AlienSlider, AlienValueBox, _settings.VoiceAlien);
         _voiceMonitorEnabled = _settings.VoiceMonitorEnabled;
         UpdateAllLabels();
     }
@@ -1172,6 +1175,7 @@ public sealed partial class MainWindow : Window
             GateThresholdDb = (float)MapCentered(GetVoiceValue(GateThresholdSlider, GateThresholdValueBox), -45, -80, -15),
             CompressorThresholdDb = (float)MapCentered(compressorValue, -24, -60, -6),
             CompressorRatio = (float)MapCentered(compressorValue, 4, 1.5, 16),
+            TimbreAmount = ToEffectAmount(GetVoiceValue(TimbreSlider, TimbreValueBox)),
             BassAmount = ToEffectAmount(GetVoiceValue(BassSlider, BassValueBox)),
             TrebleAmount = ToEffectAmount(GetVoiceValue(TrebleSlider, TrebleValueBox)),
             DistortionAmount = ToEffectAmount(GetVoiceValue(DistortionSlider, DistortionValueBox)),
@@ -1181,6 +1185,8 @@ public sealed partial class MainWindow : Window
             ReverbAmount = ToEffectAmount(GetVoiceValue(ReverbSlider, ReverbValueBox)),
             RadioAmount = ToEffectAmount(GetVoiceValue(RadioSlider, RadioValueBox)),
             BitCrusherAmount = ToEffectAmount(GetVoiceValue(BitCrusherSlider, BitCrusherValueBox)),
+            ChorusAmount = ToEffectAmount(GetVoiceValue(ChorusSlider, ChorusValueBox)),
+            AlienAmount = ToEffectAmount(GetVoiceValue(AlienSlider, AlienValueBox)),
             GateEnabled = true,
             CompressorEnabled = true,
             LimiterEnabled = true,
@@ -1792,6 +1798,7 @@ public sealed partial class MainWindow : Window
                 ["VoiceGain"] = GetVoiceValue(VoiceGainSlider, VoiceGainValueBox),
                 ["Gate"] = GetVoiceValue(GateThresholdSlider, GateThresholdValueBox),
                 ["Compressor"] = GetVoiceValue(CompressorThresholdSlider, CompressorThresholdValueBox),
+                ["Timbre"] = GetVoiceValue(TimbreSlider, TimbreValueBox),
                 ["Bass"] = GetVoiceValue(BassSlider, BassValueBox),
                 ["Treble"] = GetVoiceValue(TrebleSlider, TrebleValueBox),
                 ["Distortion"] = GetVoiceValue(DistortionSlider, DistortionValueBox),
@@ -1800,7 +1807,9 @@ public sealed partial class MainWindow : Window
                 ["Echo"] = GetVoiceValue(EchoSlider, EchoValueBox),
                 ["Reverb"] = GetVoiceValue(ReverbSlider, ReverbValueBox),
                 ["Radio"] = GetVoiceValue(RadioSlider, RadioValueBox),
-                ["BitCrusher"] = GetVoiceValue(BitCrusherSlider, BitCrusherValueBox)
+                ["BitCrusher"] = GetVoiceValue(BitCrusherSlider, BitCrusherValueBox),
+                ["Chorus"] = GetVoiceValue(ChorusSlider, ChorusValueBox),
+                ["Alien"] = GetVoiceValue(AlienSlider, AlienValueBox)
             }
         };
     }
@@ -1813,6 +1822,7 @@ public sealed partial class MainWindow : Window
             SetVoiceControlFromPreset(VoiceGainSlider, VoiceGainValueBox, preset, "VoiceGain");
             SetVoiceControlFromPreset(GateThresholdSlider, GateThresholdValueBox, preset, "Gate");
             SetVoiceControlFromPreset(CompressorThresholdSlider, CompressorThresholdValueBox, preset, "Compressor");
+            SetVoiceControlFromPreset(TimbreSlider, TimbreValueBox, preset, "Timbre");
             SetVoiceControlFromPreset(BassSlider, BassValueBox, preset, "Bass");
             SetVoiceControlFromPreset(TrebleSlider, TrebleValueBox, preset, "Treble");
             SetVoiceControlFromPreset(DistortionSlider, DistortionValueBox, preset, "Distortion");
@@ -1822,6 +1832,8 @@ public sealed partial class MainWindow : Window
             SetVoiceControlFromPreset(ReverbSlider, ReverbValueBox, preset, "Reverb");
             SetVoiceControlFromPreset(RadioSlider, RadioValueBox, preset, "Radio");
             SetVoiceControlFromPreset(BitCrusherSlider, BitCrusherValueBox, preset, "BitCrusher");
+            SetVoiceControlFromPreset(ChorusSlider, ChorusValueBox, preset, "Chorus");
+            SetVoiceControlFromPreset(AlienSlider, AlienValueBox, preset, "Alien");
         }
         finally
         {
@@ -1879,6 +1891,7 @@ public sealed partial class MainWindow : Window
         if (slider == VoiceGainSlider) return VoiceGainValueBox;
         if (slider == GateThresholdSlider) return GateThresholdValueBox;
         if (slider == CompressorThresholdSlider) return CompressorThresholdValueBox;
+        if (slider == TimbreSlider) return TimbreValueBox;
         if (slider == BassSlider) return BassValueBox;
         if (slider == TrebleSlider) return TrebleValueBox;
         if (slider == DistortionSlider) return DistortionValueBox;
@@ -1888,6 +1901,8 @@ public sealed partial class MainWindow : Window
         if (slider == ReverbSlider) return ReverbValueBox;
         if (slider == RadioSlider) return RadioValueBox;
         if (slider == BitCrusherSlider) return BitCrusherValueBox;
+        if (slider == ChorusSlider) return ChorusValueBox;
+        if (slider == AlienSlider) return AlienValueBox;
         return null;
     }
 
@@ -1896,6 +1911,7 @@ public sealed partial class MainWindow : Window
         if (textBox == VoiceGainValueBox) return VoiceGainSlider;
         if (textBox == GateThresholdValueBox) return GateThresholdSlider;
         if (textBox == CompressorThresholdValueBox) return CompressorThresholdSlider;
+        if (textBox == TimbreValueBox) return TimbreSlider;
         if (textBox == BassValueBox) return BassSlider;
         if (textBox == TrebleValueBox) return TrebleSlider;
         if (textBox == DistortionValueBox) return DistortionSlider;
@@ -1905,6 +1921,8 @@ public sealed partial class MainWindow : Window
         if (textBox == ReverbValueBox) return ReverbSlider;
         if (textBox == RadioValueBox) return RadioSlider;
         if (textBox == BitCrusherValueBox) return BitCrusherSlider;
+        if (textBox == ChorusValueBox) return ChorusSlider;
+        if (textBox == AlienValueBox) return AlienSlider;
         return null;
     }
 
@@ -1975,6 +1993,7 @@ public sealed partial class MainWindow : Window
         VoiceGainLabel.Text = "Voice Gain";
         GateThresholdLabel.Text = "Gate";
         CompressorThresholdLabel.Text = "Compressor";
+        TimbreLabel.Text = "Timbre";
         BassLabel.Text = "Bass";
         TrebleLabel.Text = "Treble";
         DistortionLabel.Text = "Distortion";
@@ -1984,6 +2003,8 @@ public sealed partial class MainWindow : Window
         ReverbLabel.Text = "Reverb";
         RadioLabel.Text = "Radio";
         BitCrusherLabel.Text = "Bit Crusher";
+        ChorusLabel.Text = "Chorus";
+        AlienLabel.Text = "Alien";
     }
 
     private static string FormatSigned(double value)
@@ -2042,6 +2063,7 @@ public sealed partial class MainWindow : Window
         _settings.VoiceGain = GetVoiceValue(VoiceGainSlider, VoiceGainValueBox);
         _settings.VoiceGate = GetVoiceValue(GateThresholdSlider, GateThresholdValueBox);
         _settings.VoiceCompressor = GetVoiceValue(CompressorThresholdSlider, CompressorThresholdValueBox);
+        _settings.VoiceTimbre = GetVoiceValue(TimbreSlider, TimbreValueBox);
         _settings.VoiceBass = GetVoiceValue(BassSlider, BassValueBox);
         _settings.VoiceTreble = GetVoiceValue(TrebleSlider, TrebleValueBox);
         _settings.VoiceDistortion = GetVoiceValue(DistortionSlider, DistortionValueBox);
@@ -2051,6 +2073,8 @@ public sealed partial class MainWindow : Window
         _settings.VoiceReverb = GetVoiceValue(ReverbSlider, ReverbValueBox);
         _settings.VoiceRadio = GetVoiceValue(RadioSlider, RadioValueBox);
         _settings.VoiceBitCrusher = GetVoiceValue(BitCrusherSlider, BitCrusherValueBox);
+        _settings.VoiceChorus = GetVoiceValue(ChorusSlider, ChorusValueBox);
+        _settings.VoiceAlien = GetVoiceValue(AlienSlider, AlienValueBox);
 
         // Keep legacy dB fields meaningful for older settings readers.
         _settings.VoiceGainDb = MapCentered(_settings.VoiceGain, 0, -24, 12);

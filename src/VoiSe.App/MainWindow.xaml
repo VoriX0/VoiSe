@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 6.3 - Voice Connected Effects">
+    Title="VoiSe Gate 6.4 - Voice Timbre and Fun Effects">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,7 +21,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 6.3" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="VoiSe Gate 6.4" FontSize="28" FontWeight="SemiBold" />
                     <TextBlock Text="Voice active sliders and tuned SoundBoard wheel zone" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -275,6 +275,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
@@ -307,13 +308,22 @@
                                 <StackPanel Grid.Row="1" Grid.Column="0" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="TimbreLabel" Text="Timbre" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" x:Name="TimbreValueBox" Text="0" MaxLength="5" TextAlignment="Right" TextChanged="OnVoiceValueTextChanged" />
+                                    </Grid>
+                                    <Slider x:Name="TimbreSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="BassLabel" Text="Bass" FontWeight="SemiBold" VerticalAlignment="Center" />
                                         <TextBox Grid.Column="1" x:Name="BassValueBox" Text="0" MaxLength="5" TextAlignment="Right" TextChanged="OnVoiceValueTextChanged" />
                                     </Grid>
                                     <Slider x:Name="BassSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                <StackPanel Grid.Row="1" Grid.Column="2" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="TrebleLabel" Text="Treble" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -322,7 +332,7 @@
                                     <Slider x:Name="TrebleSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="1" Grid.Column="2" Spacing="6">
+                                <StackPanel Grid.Row="2" Grid.Column="0" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="DistortionLabel" Text="Distortion" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -331,7 +341,7 @@
                                     <Slider x:Name="DistortionSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="2" Grid.Column="0" Spacing="6">
+                                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="RobotLabel" Text="Robot" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -340,7 +350,7 @@
                                     <Slider x:Name="RobotSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="2" Grid.Column="1" Spacing="6">
+                                <StackPanel Grid.Row="2" Grid.Column="2" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="TremoloLabel" Text="Tremolo" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -349,7 +359,7 @@
                                     <Slider x:Name="TremoloSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="2" Grid.Column="2" Spacing="6">
+                                <StackPanel Grid.Row="3" Grid.Column="0" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="EchoLabel" Text="Echo" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -358,7 +368,7 @@
                                     <Slider x:Name="EchoSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="3" Grid.Column="0" Spacing="6">
+                                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="ReverbLabel" Text="Reverb" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -367,7 +377,7 @@
                                     <Slider x:Name="ReverbSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="3" Grid.Column="1" Spacing="6">
+                                <StackPanel Grid.Row="3" Grid.Column="2" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="RadioLabel" Text="Radio" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -376,7 +386,7 @@
                                     <Slider x:Name="RadioSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="3" Grid.Column="2" Spacing="6">
+                                <StackPanel Grid.Row="4" Grid.Column="0" Spacing="6">
                                     <Grid ColumnSpacing="8">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
                                         <TextBlock x:Name="BitCrusherLabel" Text="Bit Crusher" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -384,6 +394,25 @@
                                     </Grid>
                                     <Slider x:Name="BitCrusherSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
                                 </StackPanel>
+
+                                <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ChorusLabel" Text="Chorus" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" x:Name="ChorusValueBox" Text="0" MaxLength="5" TextAlignment="Right" TextChanged="OnVoiceValueTextChanged" />
+                                    </Grid>
+                                    <Slider x:Name="ChorusSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="4" Grid.Column="2" Spacing="6">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /></Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="AlienLabel" Text="Alien" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" x:Name="AlienValueBox" Text="0" MaxLength="5" TextAlignment="Right" TextChanged="OnVoiceValueTextChanged" />
+                                    </Grid>
+                                    <Slider x:Name="AlienSlider" Minimum="-100" Maximum="100" Value="0" StepFrequency="1" ValueChanged="OnVoiceSettingsChanged" />
+                                </StackPanel>
+
                             </Grid>
 
                             <StackPanel Spacing="12">

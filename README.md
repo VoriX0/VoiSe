@@ -1,6 +1,6 @@
-# VoiSe Gate 6.3 — Voice Connected Effects
+# VoiSe Gate 6.4 — Voice Timbre and Fun Effects
 
-Gate 6.3 expands the Voice Changer tab with connected real-time DSP sliders.
+Gate 6.4 adds the required **Timbre** slider for moving the voice color toward a darker/bassier or brighter/squeakier tone, plus a couple of extra fun DSP effects.
 
 ## Run
 
@@ -8,11 +8,12 @@ Gate 6.3 expands the Voice Changer tab with connected real-time DSP sliders.
 dotnet run --project src/VoiSe.App
 ```
 
-## New active voice sliders
+## Active voice sliders
 
 - Voice Gain
 - Gate
 - Compressor
+- Timbre
 - Bass
 - Treble
 - Distortion
@@ -22,12 +23,19 @@ dotnet run --project src/VoiSe.App
 - Reverb
 - Radio
 - Bit Crusher
+- Chorus
+- Alien
 
-Sliders remain -100..+100. Numeric boxes can store -9999..+9999; the real-time DSP clamps extreme values internally to keep the audio path stable.
+## Timbre behavior
+
+- Negative values: darker, bassier voice color.
+- Positive values: brighter, thinner, squeakier voice color.
+
+This is still a real-time DSP approximation, not a full formant/pitch shifter. Proper pitch/formant shifting remains a separate Gate because it needs a dedicated library.
 
 ## Presets
 
-New and recreated presets now save all active Gate 6.3 sliders as separate JSON files in:
+New and recreated presets save all active Gate 6.4 sliders as separate JSON files in:
 
 ```powershell
 %LOCALAPPDATA%\VoiSe\presets\
