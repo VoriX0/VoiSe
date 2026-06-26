@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.11 - SoundBoard Scroll Area Fix">
+    Title="VoiSe Gate 5.14 - SoundBoard Overlay Scroll Fix">
 
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
@@ -21,8 +21,8 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                <TextBlock Text="VoiSe Gate 5.11" FontSize="28" FontWeight="SemiBold" />
-                <TextBlock Text="SoundBoard polish: full-area scrolling and double-click play" Opacity="0.75" />
+                <TextBlock Text="VoiSe Gate 5.14" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="SoundBoard polish: overlay scrolling and head alignment" Opacity="0.75" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -51,11 +51,11 @@
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="48" />
+                            <RowDefinition Height="48" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Column="0" Grid.Row="0" Grid.RowSpan="3" RowSpacing="8" ColumnSpacing="8" Width="164" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Grid Grid.Column="0" Grid.Row="1" Grid.RowSpan="2" RowSpacing="8" ColumnSpacing="8" Width="164" HorizontalAlignment="Left" VerticalAlignment="Top">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="48" />
                                 <RowDefinition Height="48" />
@@ -82,14 +82,14 @@
                                 </Ellipse.RenderTransform>
                             </Ellipse>
                         </Grid>
-                        <Grid Grid.Row="2" Grid.Column="2">
+                        <Grid Grid.Row="2" Grid.Column="2" VerticalAlignment="Bottom" Margin="0,0,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="CurrentTimeTextBlock" Text="00:00" />
-                            <TextBlock Grid.Column="2" x:Name="TotalTimeTextBlock" Text="00:00" />
+                            <TextBlock x:Name="CurrentTimeTextBlock" Text="00:00" VerticalAlignment="Bottom" />
+                            <TextBlock Grid.Column="2" x:Name="TotalTimeTextBlock" Text="00:00" VerticalAlignment="Bottom" />
                         </Grid>
 
                         <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="3" Spacing="6" VerticalAlignment="Top">
@@ -130,45 +130,34 @@
 
                         <Grid Grid.Row="3"
                               x:Name="SoundListArea"
-                              Background="Transparent"
-                              VerticalAlignment="Stretch"
-                              HorizontalAlignment="Stretch"
-                              PointerWheelChanged="OnSoundListPointerWheelChanged">
-                            <ScrollViewer x:Name="SoundListScrollViewer"
-                                          Background="Transparent"
-                                          VerticalAlignment="Stretch"
-                                          HorizontalAlignment="Stretch"
-                                          VerticalScrollBarVisibility="Visible"
-                                          VerticalScrollMode="Enabled"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          HorizontalScrollMode="Disabled"
-                                          PointerWheelChanged="OnSoundListPointerWheelChanged">
-                                <ListView x:Name="SoundListView"
-                                          Background="Transparent"
-                                          DisplayMemberPath="ListText"
-                                          SelectionChanged="OnSoundSelectionChanged"
-                                          RightTapped="OnSoundListRightTapped"
-                                          DoubleTapped="OnSoundListDoubleTapped"
-                                          VerticalAlignment="Stretch"
-                                          HorizontalAlignment="Stretch"
-                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                          ScrollViewer.VerticalScrollMode="Disabled"
-                                          ScrollViewer.HorizontalScrollMode="Disabled"
-                                          IsTabStop="True"
-                                          PointerWheelChanged="OnSoundListPointerWheelChanged">
-                                    <ListView.ContextFlyout>
-                                        <MenuFlyout>
-                                            <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
-                                            <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
-                                            <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
-                                            <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
-                                        </MenuFlyout>
-                                    </ListView.ContextFlyout>
-                                </ListView>
-                            </ScrollViewer>
+                              Canvas.ZIndex="100"
+                              Background="#01000000"
+                              VerticalAlignment="Top"
+                              HorizontalAlignment="Stretch">
+                            <ListView x:Name="SoundListView"
+                                      Background="#01000000"
+                                      DisplayMemberPath="ListText"
+                                      SelectionChanged="OnSoundSelectionChanged"
+                                      RightTapped="OnSoundListRightTapped"
+                                      DoubleTapped="OnSoundListDoubleTapped"
+                                      VerticalAlignment="Stretch"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollMode="Enabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled"
+                                      IsTabStop="True">
+                                <ListView.ContextFlyout>
+                                    <MenuFlyout>
+                                        <MenuFlyoutItem Text="Play" Click="OnSoundContextPlayClick" />
+                                        <MenuFlyoutItem Text="Assign Hotkey" Click="OnSoundContextAssignHotkeyClick" />
+                                        <MenuFlyoutItem Text="Rename" Click="OnSoundContextRenameClick" />
+                                        <MenuFlyoutItem Text="Choose Another File" Click="OnSoundContextReplaceFileClick" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Delete From Category" Click="OnSoundContextDeleteClick" />
+                                    </MenuFlyout>
+                                </ListView.ContextFlyout>
+                            </ListView>
                         </Grid>
                     </Grid>
 
@@ -201,7 +190,7 @@
 
             <TabViewItem Header="Scenes" IsClosable="False">
                 <StackPanel Spacing="12" Padding="0,16,0,0">
-                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.10. This tab reserves the final navigation structure from the start." />
+                    <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.14. This tab reserves the final navigation structure from the start." />
                     <TextBlock Text="Planned scene content:" FontSize="18" FontWeight="SemiBold" />
                     <TextBlock Text="• voice preset&#x0a;• one background loop sound&#x0a;• several one-shot sounds&#x0a;• scene mixer settings" />
                 </StackPanel>
@@ -247,26 +236,24 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Grid Grid.Row="1" x:Name="SettingsLogArea" RowSpacing="6" Background="Transparent">
+                    <Grid Grid.Row="1" x:Name="SettingsLogArea" RowSpacing="6" Background="#01000000">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Log" FontWeight="SemiBold" />
-                        <ScrollViewer Grid.Row="1"
-                                      x:Name="LogScrollViewer"
-                                      Background="Transparent"
-                                      VerticalAlignment="Stretch"
-                                      HorizontalAlignment="Stretch"
-                                      VerticalScrollBarVisibility="Visible"
-                                      VerticalScrollMode="Enabled"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      HorizontalScrollMode="Disabled"
-                                      PointerWheelChanged="OnLogPointerWheelChanged">
-                            <TextBlock x:Name="LogTextBlock"
-                                       TextWrapping="Wrap"
-                                       PointerWheelChanged="OnLogPointerWheelChanged" />
-                        </ScrollViewer>
+                        <TextBox Grid.Row="1"
+                                 x:Name="LogTextBox"
+                                 IsReadOnly="True"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Background="#01000000"
+                                 VerticalAlignment="Stretch"
+                                 HorizontalAlignment="Stretch"
+                                 ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                 ScrollViewer.VerticalScrollMode="Enabled"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.HorizontalScrollMode="Disabled" />
                     </Grid>
                 </Grid>
             </TabViewItem>

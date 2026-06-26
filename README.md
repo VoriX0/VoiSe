@@ -1,29 +1,28 @@
-# VoiSe Gate 5.11 — SoundBoard Scroll Area Fix
+# VoiSe Gate 5.14 - SoundBoard Overlay Scroll Fix
 
-Gate 5.11 исправляет оставшуюся проблему прокрутки: часть нижней области вкладок принимала колесо мыши, но не прокручивала список треков или лог. Дополнительно добавлен запуск трека двойным щелчком.
+Gate 5.14 continues polishing the SoundBoard UI.
 
-## Что изменено
+## Changes
 
-- заголовок окна: `VoiSe Gate 5.11 - SoundBoard Scroll Area Fix`;
-- кнопки `Start Engine / Stop Engine` сделаны немного крупнее;
-- для списка треков добавлена отдельная прозрачная область, которая занимает всё доступное место под кнопками `Add Track / Delete Track`;
-- обработка колёсика мыши теперь подключена не только к самому списку, но и к его внешней области;
-- добавлена дополнительная маршрутизация колеса мыши от вкладки к нужной прокручиваемой области, чтобы пустая зона больше не гасила прокрутку;
-- аналогичная обработка добавлена для области логов в `Settings`;
-- добавлен запуск трека двойным щелчком по строке трека;
-- кастомный таймлайн из Gate 5.9/5.10 сохранён.
+- Window title and visible app header now show **VoiSe Gate 5.14**.
+- Track list area is recreated as an explicit top overlay-style area with its own native `ListView` scrolling.
+- The track list height is recalculated from the real cursor/list position to the bottom of the window, which should help in maximized/fullscreen mode.
+- Settings log area gets an explicit height recalculation as well.
+- Current track time and total duration are bottom-aligned with the Stop button while the timeline remains one line above them.
+- Double-click on a track still starts playback.
 
-## Запуск
+## Run
 
 ```powershell
 dotnet run --project src/VoiSe.App
 ```
 
-## Проверка
+## Check
 
-1. В заголовке окна должно быть `VoiSe Gate 5.11`.
-2. Колесо мыши должно прокручивать список треков даже в нижней части области списка.
-3. Колесо мыши должно прокручивать лог во вкладке `Settings`.
-4. Двойной щелчок по треку должен запускать выбранный трек.
-5. `Start Engine / Stop Engine` должны быть чуть крупнее, чем в Gate 5.10.
-6. Таймлайн должен продолжать работать и показывать время, а не сырые числа.
+1. Open the app maximized/fullscreen.
+2. Add enough tracks to require scrolling.
+3. Try mouse-wheel scrolling below the fourth track.
+4. Check Settings log scrolling.
+5. Check that current time and total duration align with the bottom of the Stop button.
+
+If scrolling still fails, the next diagnostic gate should enable visible debug borders around all major layout zones to find the overlay that steals wheel hit-testing.

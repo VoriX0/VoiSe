@@ -10,6 +10,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
+using Windows.Foundation;
 using WinRT.Interop;
 
 namespace VoiSe.App;
@@ -34,8 +35,7 @@ public sealed partial class MainWindow : Window
     private bool _loadingSettings = true;
     private bool _loadedOnce;
     private bool _timelineUserDragging;
-    private bool _updatingTimeline;
-    private double _timelineMaximumSeconds = 1.0;
+        private double _timelineMaximumSeconds = 1.0;
 
     public MainWindow()
     {
@@ -62,55 +62,73 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.11 UI started.");
+        AppendLog("Gate 5.14 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
 
     private void RegisterWheelRoutingHandlers()
     {
-        var soundWheelHandler = new PointerEventHandler(OnSoundListPointerWheelChanged);
-        SoundListArea.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
-        SoundListScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
-        SoundListView.AddHandler(UIElement.PointerWheelChangedEvent, soundWheelHandler, handledEventsToo: true);
-
-        var logWheelHandler = new PointerEventHandler(OnLogPointerWheelChanged);
-        SettingsLogArea.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
-        LogScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
-        LogTextBlock.AddHandler(UIElement.PointerWheelChangedEvent, logWheelHandler, handledEventsToo: true);
-
-        RootGrid.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnRootPointerWheelChanged), handledEventsToo: true);
+        // Gate 5.14: the track list is treated as an explicit top overlay area.
+        // The earlier auto/star layout visually left empty space below the 4th row in maximized
+        // mode, but that space was not actually owned by the ListView, so wheel events died there.
+        RootGrid.SizeChanged += OnRootGridSizeChanged;
+        MainTabView.SizeChanged += OnRootGridSizeChanged;
+        DispatcherQueue.TryEnqueue(UpdateDynamicScrollAreaHeights);
     }
 
-    private void OnRootPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (e.Handled)
+        UpdateDynamicScrollAreaHeights();
+    }
+
+    private void UpdateDynamicScrollAreaHeights()
+    {
+        UpdateSoundListOverlayHeight();
+        UpdateSettingsLogHeight();
+    }
+
+    private void UpdateSoundListOverlayHeight()
+    {
+        if (RootGrid is null || SoundListArea is null || SoundListView is null || RootGrid.ActualHeight <= 0)
         {
             return;
         }
 
-        var selectedHeader = (MainTabView.SelectedItem as TabViewItem)?.Header?.ToString();
-        if (selectedHeader == "SoundBoard" && IsPointerInsideElement(e, SoundBoardBodyGrid))
+        try
         {
-            ScrollByMouseWheel(SoundListScrollViewer, e);
-            return;
+            var top = SoundListArea.TransformToVisual(RootGrid).TransformPoint(new Point(0, 0)).Y;
+            var targetTrackListHeight = Math.Max(260, RootGrid.ActualHeight - top - 24);
+            SoundListArea.Height = targetTrackListHeight;
+            SoundListView.Height = targetTrackListHeight;
+            SoundListArea.MinHeight = targetTrackListHeight;
+            SoundListView.MinHeight = targetTrackListHeight;
         }
-
-        if (selectedHeader == "Settings" && IsPointerInsideElement(e, SettingsLogArea))
+        catch
         {
-            ScrollByMouseWheel(LogScrollViewer, e);
+            var fallbackHeight = Math.Max(260, RootGrid.ActualHeight - 420);
+            SoundListArea.Height = fallbackHeight;
+            SoundListView.Height = fallbackHeight;
         }
     }
 
-    private static bool IsPointerInsideElement(PointerRoutedEventArgs e, FrameworkElement element)
+    private void UpdateSettingsLogHeight()
     {
-        if (element.ActualWidth <= 0 || element.ActualHeight <= 0)
+        if (RootGrid is null || SettingsLogArea is null || LogTextBox is null || RootGrid.ActualHeight <= 0)
         {
-            return false;
+            return;
         }
 
-        var point = e.GetCurrentPoint(element).Position;
-        return point.X >= 0 && point.Y >= 0 && point.X <= element.ActualWidth && point.Y <= element.ActualHeight;
+        try
+        {
+            var top = LogTextBox.TransformToVisual(RootGrid).TransformPoint(new Point(0, 0)).Y;
+            var targetLogHeight = Math.Max(140, RootGrid.ActualHeight - top - 24);
+            LogTextBox.Height = targetLogHeight;
+        }
+        catch
+        {
+            LogTextBox.Height = 180;
+        }
     }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
@@ -130,20 +148,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.11 restore started.");
+            StartupLog.Write("Gate 5.14 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.11 scalar settings applied.");
+            StartupLog.Write("Gate 5.14 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
+            DispatcherQueue.TryEnqueue(UpdateDynamicScrollAreaHeights);
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.11 restore completed.");
+            StartupLog.Write("Gate 5.14 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.11 restore error: " + ex);
+            StartupLog.Write("Gate 5.14 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -1068,46 +1087,16 @@ public sealed partial class MainWindow : Window
         _settingsStore.Save(_settings);
     }
 
-    private void OnSoundListPointerWheelChanged(object sender, PointerRoutedEventArgs e)
-    {
-        ScrollByMouseWheel(SoundListScrollViewer, e);
-    }
-
-    private void OnLogPointerWheelChanged(object sender, PointerRoutedEventArgs e)
-    {
-        ScrollByMouseWheel(LogScrollViewer, e);
-    }
-
-    private static void ScrollByMouseWheel(ScrollViewer scrollViewer, PointerRoutedEventArgs e)
-    {
-        if (scrollViewer is null)
-        {
-            return;
-        }
-
-        var point = e.GetCurrentPoint(scrollViewer);
-        var delta = point.Properties.MouseWheelDelta;
-        if (delta == 0)
-        {
-            return;
-        }
-
-        var targetOffset = scrollViewer.VerticalOffset - (delta * 0.45);
-        targetOffset = Math.Max(0, Math.Min(scrollViewer.ScrollableHeight, targetOffset));
-        scrollViewer.ChangeView(null, targetOffset, null, disableAnimation: true);
-        e.Handled = true;
-    }
-
     private void AppendLog(string message)
     {
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        LogTextBlock.Text = string.IsNullOrEmpty(LogTextBlock.Text)
+        LogTextBox.Text = string.IsNullOrEmpty(LogTextBox.Text)
             ? line
-            : LogTextBlock.Text + Environment.NewLine + line;
+            : LogTextBox.Text + Environment.NewLine + line;
 
         DispatcherQueue.TryEnqueue(() =>
         {
-            LogScrollViewer.ChangeView(null, LogScrollViewer.ScrollableHeight, null, disableAnimation: true);
+            LogTextBox.Select(LogTextBox.Text.Length, 0);
         });
     }
 }
