@@ -46,9 +46,9 @@ public sealed partial class MainWindow : Window
     private IntPtr _windowHandle;
     private const int WhMouseLl = 14;
     private const int WmMouseWheel = 0x020A;
-    private const double SoundWheelZoneExpandUpRatio = 0.30;
+    private const double SoundWheelZoneExpandUpRatio = 0.25;
     private const double SoundWheelZoneExpandRightRatio = 0.60;
-    private const double SoundWheelZoneExpandBottomRatio = 0.30;
+    private const double SoundWheelZoneExpandBottomRatio = 0.40;
 
     public MainWindow()
     {
@@ -77,7 +77,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.33 UI started.");
+        AppendLog("Gate 5.34 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -99,20 +99,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.33 restore started.");
+            StartupLog.Write("Gate 5.34 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.33 scalar settings applied.");
+            StartupLog.Write("Gate 5.34 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.33 restore completed.");
+            StartupLog.Write("Gate 5.34 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.33 restore error: " + ex);
+            StartupLog.Write("Gate 5.34 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -218,7 +218,7 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
-        // Gate 5.33: keep the visual layout unchanged, but make the global
+        // Gate 5.34: keep the visual layout unchanged, but make the global
         // wheel catch-zone deliberately larger. The previous calibration proved
         // that the physical wheel hit area is offset from the visual Sounds list.
         // Instead of shifting the zone, expand it upward and to the right so the
@@ -246,7 +246,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateSoundInputOverlayBounds()
     {
-        // Gate 5.33: SoundInputOverlay is still placed directly inside SoundListArea.
+        // Gate 5.34: SoundInputOverlay is still placed directly inside SoundListArea.
         // It stretches with the Sounds list, so no window-level coordinate transform is used.
         if (SoundInputOverlay is null || MainTabView is null)
         {

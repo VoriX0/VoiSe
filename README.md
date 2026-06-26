@@ -1,13 +1,16 @@
-# VoiSe Gate 5.33 — SoundBoard Expanded Wheel Zone
+# VoiSe Gate 5.36 — SoundBoard Timeline 10 Percent Polish
 
-Gate 5.33 keeps the Gate 5.31 design and changes only the SoundBoard wheel-zone calibration.
+Gate 5.36 starts from Gate 5.34 and adjusts only the SoundBoard timeline vertical position.
 
 ## Changes
 
-- Window/header version updated to Gate 5.33.
-- The global SoundBoard wheel zone is shifted 30% left and 30% down for calibration.
-- The Sounds list still scrolls; the rest of the design is unchanged.
-- Double-click and right-click/context menu handling from Gate 5.29+ are preserved.
+- Window/header version updated to Gate 5.36.
+- Sounds wheel catch-zone is expanded 10% further downward compared with Gate 5.33.
+- Top expansion is reduced from 30% to 25% and still clamped so it does not go above the tab selection area.
+- Right expansion remains 60%.
+- Visual SoundBoard design is unchanged.
+- Sounds list is still the only thing that scrolls.
+- Double click and context menu handling are kept from the working overlay version.
 
 ## Run
 
@@ -15,9 +18,13 @@ Gate 5.33 keeps the Gate 5.31 design and changes only the SoundBoard wheel-zone 
 dotnet run --project src/VoiSe.App
 ```
 
+## Gate 5.36
 
-## Gate 5.33
+Check the former dead zones in the lower and right parts of the Sounds list.
 
-- Expanded the SoundBoard wheel catch-zone upward by 30% and to the right by 60%.
-- Kept the current visual design unchanged.
-- Kept the Sounds overlay input handling for double-click and context menu.
+
+## Gate 5.36
+
+- Based on Gate 5.34.
+- Moved the Play/Pause button and timeline line down by 10 px, roughly 10% of the 104 px timeline area.
+- Kept the Gate 5.34 wheel-zone tuning unchanged.

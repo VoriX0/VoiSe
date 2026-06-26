@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.33 - SoundBoard Expanded Wheel Zone">
+    Title="VoiSe Gate 5.36 - SoundBoard Timeline 10 Percent Polish">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 5.33" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="SoundBoard expanded wheel zone for Sounds list" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 5.36" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="SoundBoard timeline 10 percent polish" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -89,9 +89,16 @@
                                             <RowDefinition Height="20" />
                                         </Grid.RowDefinitions>
 
-                                        <Button Grid.Row="0" Grid.Column="0" x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="22" MinWidth="0" Width="56" Height="48" HorizontalAlignment="Left" VerticalAlignment="Center" Click="OnPlayPauseSoundClick" ToolTipService.ToolTip="Play / Pause" />
+                                        <Button Grid.Row="0" Grid.Column="0" x:Name="PlayPauseButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets" FontSize="22" MinWidth="0" Width="56" Height="48" HorizontalAlignment="Left" VerticalAlignment="Center" Click="OnPlayPauseSoundClick" ToolTipService.ToolTip="Play / Pause">
+                                            <Button.RenderTransform>
+                                                <TranslateTransform Y="10" />
+                                            </Button.RenderTransform>
+                                        </Button>
 
                                         <Grid Grid.Row="0" Grid.Column="1" x:Name="TimelineHost" Height="48" VerticalAlignment="Center" Background="#01000000" PointerPressed="OnTimelineHostPointerPressed" PointerMoved="OnTimelineHostPointerMoved" PointerReleased="OnTimelineHostPointerReleased" PointerCanceled="OnTimelineHostPointerReleased" SizeChanged="OnTimelineHostSizeChanged">
+                                            <Grid.RenderTransform>
+                                                <TranslateTransform Y="10" />
+                                            </Grid.RenderTransform>
                                             <Grid Height="8" VerticalAlignment="Center">
                                                 <Border Background="#33FFFFFF" CornerRadius="4" />
                                                 <Border x:Name="TimelineFill" Width="0" HorizontalAlignment="Left" Background="#99FFFFFF" CornerRadius="4" />
@@ -218,7 +225,7 @@
                                                 <StackPanel x:Name="SoundItemsPanel" Spacing="4" Padding="0,0,0,8" />
                                             </ScrollViewer>
 
-                                            <!-- Gate 5.33: local input overlay lives in the same cell as the visual Sounds list.
+                                            <!-- Gate 5.34: local input overlay lives in the same cell as the visual Sounds list.
                                                  No TransformToVisual/Margin positioning, so the wheel/click zone cannot drift in fullscreen. -->
                                             <Border x:Name="SoundInputOverlay"
                                                     Background="#01000000"
