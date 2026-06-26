@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
@@ -36,6 +37,10 @@ public sealed partial class MainWindow : Window
     private bool _loadedOnce;
     private bool _timelineUserDragging;
     private double _timelineMaximumSeconds = 1.0;
+    private readonly SubclassProc _subclassProc;
+    private readonly IntPtr _windowHandle;
+    private const uint WindowSubclassId = 520;
+    private const uint WmMouseWheel = 0x020A;
 
     public MainWindow()
     {
@@ -44,6 +49,9 @@ public sealed partial class MainWindow : Window
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
+        _subclassProc = WindowSubclassProc;
+        _windowHandle = WindowNative.GetWindowHandle(this);
+        SetWindowSubclass(_windowHandle, _subclassProc, new UIntPtr(WindowSubclassId), IntPtr.Zero);
         RegisterWheelRoutingHandlers();
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         Closed += OnClosed;
@@ -62,17 +70,56 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.19 UI started.");
+        AppendLog("Gate 5.20 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
 
     private void RegisterWheelRoutingHandlers()
     {
-        // Gate 5.19: no fullscreen coordinate hacks. The track list and Settings log
-        // own their real layout area and receive wheel events directly.
+        // Gate 5.20: keep native control handling, but also install a window-level
+        // WM_MOUSEWHEEL fallback below. This avoids the fullscreen hit-test offset
+        // where the real scrollable area can be visually lower than the routed event target.
+        RootGrid.SizeChanged += OnRootGridSizeChanged;
         SoundListView.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundListPointerWheelChanged), true);
         LogTextBox.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnLogPointerWheelChanged), true);
+        DispatcherQueue.TryEnqueue(UpdateDynamicScrollAreaHeights);
+    }
+
+    private void OnRootGridSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateDynamicScrollAreaHeights();
+    }
+
+    private void UpdateDynamicScrollAreaHeights()
+    {
+        // Explicitly size the visually scrollable zones from their actual top edge
+        // to the bottom of the app surface. This prevents ListView/TextBox hit-test
+        // areas from collapsing to only a few visible rows in maximized windows.
+        UpdateElementHeightToBottom(SoundListArea, minHeight: 180, bottomPadding: 8);
+        UpdateElementHeightToBottom(SoundListView, minHeight: 176, bottomPadding: 12);
+    }
+
+    private void UpdateElementHeightToBottom(FrameworkElement? element, double minHeight, double bottomPadding)
+    {
+        if (element is null || RootGrid is null || RootGrid.ActualHeight <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var topLeft = element.TransformToVisual(RootGrid).TransformPoint(new Point(0, 0));
+            var targetHeight = Math.Max(minHeight, RootGrid.ActualHeight - topLeft.Y - bottomPadding);
+            if (!double.IsNaN(targetHeight) && !double.IsInfinity(targetHeight))
+            {
+                element.Height = targetHeight;
+            }
+        }
+        catch
+        {
+            // Layout may not be ready yet; the next SizeChanged/Dispatcher pass will retry.
+        }
     }
 
     private void OnSoundListPointerWheelChanged(object sender, PointerRoutedEventArgs e)
@@ -93,8 +140,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-
-
     private bool TryScrollElement(DependencyObject? scrollOwner, int wheelDelta)
     {
         var scrollViewer = FindDescendant<ScrollViewer>(scrollOwner);
@@ -104,11 +149,85 @@ public sealed partial class MainWindow : Window
         }
 
         // MouseWheelDelta is usually +120 for wheel up and -120 for wheel down.
-        // ScrollViewer vertical offset grows downward, so subtract delta.
-        var target = scrollViewer.VerticalOffset - wheelDelta;
+        // ScrollViewer vertical offset grows downward, so a positive wheel delta
+        // should decrease the offset. Use a stable per-notch distance instead of
+        // the raw delta to avoid jumping too far.
+        var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
+        var step = 72.0 * notches;
+        var target = scrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
         target = Math.Max(0, Math.Min(scrollViewer.ScrollableHeight, target));
         scrollViewer.ChangeView(null, target, null, disableAnimation: true);
         return true;
+    }
+
+    private IntPtr WindowSubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, UIntPtr idSubclass, IntPtr refData)
+    {
+        if (msg == WmMouseWheel && TryRouteWindowMouseWheel(wParam))
+        {
+            return IntPtr.Zero;
+        }
+
+        return DefSubclassProc(hWnd, msg, wParam, lParam);
+    }
+
+    private bool TryRouteWindowMouseWheel(IntPtr wParam)
+    {
+        var delta = unchecked((short)((wParam.ToInt64() >> 16) & 0xffff));
+        if (delta == 0)
+        {
+            return false;
+        }
+
+        // SoundBoard tab: route wheel by the visual list rectangle, not by hit-test.
+        // The rectangle intentionally extends from SoundListArea's visual top edge
+        // to the bottom of RootGrid.
+        if (MainTabView?.SelectedIndex == 0 && IsCursorInsideElementColumnToBottom(SoundListArea))
+        {
+            return TryScrollElement(SoundListView, delta);
+        }
+
+        // Settings tab: same fallback for the log panel.
+        if (MainTabView?.SelectedIndex == 3 && IsCursorInsideElementColumnToBottom(LogTextBox))
+        {
+            return TryScrollElement(LogTextBox, delta);
+        }
+
+        return false;
+    }
+
+    private bool IsCursorInsideElementColumnToBottom(FrameworkElement? element)
+    {
+        if (element is null || RootGrid is null || _windowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (!GetCursorPos(out var screenPoint))
+        {
+            return false;
+        }
+
+        var clientPoint = screenPoint;
+        if (!ScreenToClient(_windowHandle, ref clientPoint))
+        {
+            return false;
+        }
+
+        var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
+        var cursorX = clientPoint.X / scale;
+        var cursorY = clientPoint.Y / scale;
+
+        try
+        {
+            var topLeft = element.TransformToVisual(RootGrid).TransformPoint(new Point(0, 0));
+            var right = Math.Max(topLeft.X + element.ActualWidth, RootGrid.ActualWidth - 8);
+            var bottom = RootGrid.ActualHeight - 8;
+            return cursorX >= topLeft.X && cursorX <= right && cursorY >= topLeft.Y && cursorY <= bottom;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static T? FindDescendant<T>(DependencyObject? root) where T : DependencyObject
@@ -137,7 +256,29 @@ public sealed partial class MainWindow : Window
         return null;
     }
 
+    private delegate IntPtr SubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, UIntPtr idSubclass, IntPtr refData);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass, IntPtr dwRefData);
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern bool RemoveWindowSubclass(IntPtr hWnd, SubclassProc pfnSubclass, UIntPtr uIdSubclass);
+
+    [DllImport("Comctl32.dll", SetLastError = true)]
+    private static extern IntPtr DefSubclassProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint lpPoint);
+
+    [DllImport("user32.dll")]
+    private static extern bool ScreenToClient(IntPtr hWnd, ref NativePoint lpPoint);
 
 
 
@@ -149,6 +290,7 @@ public sealed partial class MainWindow : Window
         }
 
         _loadedOnce = true;
+        DispatcherQueue.TryEnqueue(UpdateDynamicScrollAreaHeights);
         RestoreSettingsAfterWindowActivation();
     }
 
@@ -158,20 +300,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.19 restore started.");
+            StartupLog.Write("Gate 5.20 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.19 scalar settings applied.");
+            StartupLog.Write("Gate 5.20 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.19 restore completed.");
+            StartupLog.Write("Gate 5.20 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.19 restore error: " + ex);
+            StartupLog.Write("Gate 5.20 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -209,6 +351,7 @@ public sealed partial class MainWindow : Window
     private void OnMainTabSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // Gate 5.6: bottom stats panel was removed. Settings tab owns the log panel now.
+        DispatcherQueue.TryEnqueue(UpdateDynamicScrollAreaHeights);
     }
 
     private void UpdateBottomPanelVisibility()
@@ -222,6 +365,10 @@ public sealed partial class MainWindow : Window
         SaveCurrentSettings();
         StopEngine(log: false);
         _timelineTimer.Stop();
+        if (_windowHandle != IntPtr.Zero)
+        {
+            RemoveWindowSubclass(_windowHandle, _subclassProc, new UIntPtr(WindowSubclassId));
+        }
         _catalog.Dispose();
     }
 

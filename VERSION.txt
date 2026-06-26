@@ -1,1 +1,1 @@
-VoiSe Gate 5.19 - SoundBoard Native Scroll Cleanup
+VoiSe Gate 5.20 - SoundBoard Window Wheel Fix
