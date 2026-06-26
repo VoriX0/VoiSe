@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.20 - SoundBoard Window Wheel Fix">
+    Title="VoiSe Gate 5.21 - SoundBoard Wide Track List">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 5.20" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="SoundBoard window-level wheel routing and layout alignment fix" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 5.21" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="SoundBoard wide track list without track scrolling" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -127,56 +127,51 @@
 
                         <!-- BODY -->
                         <Border Grid.Row="1" Padding="6">
-                            <Grid x:Name="SoundBoardBodyGrid" RowSpacing="4" Background="Transparent">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
+                            <Grid x:Name="SoundBoardBodyGrid" ColumnSpacing="0" Background="Transparent" VerticalAlignment="Top">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="25*" />
+                                    <ColumnDefinition Width="5*" />
+                                    <ColumnDefinition Width="70*" />
+                                </Grid.ColumnDefinitions>
 
-                                <Border Grid.Row="0" Padding="4">
+                                <!-- LEFT: categories stay in the same visual area -->
+                                <StackPanel Grid.Column="0" Spacing="8" VerticalAlignment="Top">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <Button Content="Create Category" Click="OnAddCategoryClick" />
                                         <Button Content="Rename Category" Click="OnRenameCategoryClick" />
                                         <Button Content="Delete Category" Click="OnDeleteCategoryClick" />
                                     </StackPanel>
-                                </Border>
 
-                                <Border Grid.Row="1" Padding="4" Margin="0,0,0,8">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="1*" />
-                                            <ColumnDefinition Width="3*" />
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox Grid.Column="0" x:Name="CategoryComboBox" DisplayMemberPath="Name" PlaceholderText="Choose category" SelectionChanged="OnCategorySelectionChanged" HorizontalAlignment="Stretch" />
-                                    </Grid>
-                                </Border>
+                                    <ComboBox x:Name="CategoryComboBox"
+                                              DisplayMemberPath="Name"
+                                              PlaceholderText="Choose category"
+                                              SelectionChanged="OnCategorySelectionChanged"
+                                              HorizontalAlignment="Stretch" />
 
-                                <Border Grid.Row="2" Padding="4" Margin="0,8,0,2">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0">
                                         <Button Content="Add Track" Click="OnAddSoundClick" />
                                         <Button Content="Delete Track" Click="OnDeleteSoundClick" />
                                     </StackPanel>
-                                </Border>
+                                </StackPanel>
 
-                                <Border Grid.Row="3"
+                                <!-- RIGHT: no separate track scrolling; the list is measured as content -->
+                                <Border Grid.Column="2"
                                         x:Name="SoundListArea"
-                                        Background="#01000000"
-                                        Padding="2"
-                                        VerticalAlignment="Stretch"
+                                        Background="Transparent"
+                                        Padding="0"
+                                        VerticalAlignment="Top"
                                         HorizontalAlignment="Stretch">
                                     <ListView x:Name="SoundListView"
-                                              Background="#01000000"
+                                              Background="Transparent"
                                               DisplayMemberPath="ListText"
                                               SelectionChanged="OnSoundSelectionChanged"
                                               RightTapped="OnSoundListRightTapped"
                                               DoubleTapped="OnSoundListDoubleTapped"
-                                              VerticalAlignment="Stretch"
+                                              VerticalAlignment="Top"
                                               HorizontalAlignment="Stretch"
-                                              ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                              ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                              ScrollViewer.VerticalScrollMode="Enabled"
+                                              ScrollViewer.VerticalScrollMode="Disabled"
                                               ScrollViewer.HorizontalScrollMode="Disabled"
                                               IsTabStop="True">
                                         <ListView.ContextFlyout>
@@ -225,7 +220,7 @@
                 <TabViewItem Header="Scenes" IsClosable="False">
                     <Border Padding="4">
                         <StackPanel Spacing="12" Padding="0,16,0,0">
-                            <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.20. This tab reserves the final navigation structure from the start." />
+                            <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.21. This tab reserves the final navigation structure from the start." />
                             <TextBlock Text="Planned scene content:" FontSize="18" FontWeight="SemiBold" />
                             <TextBlock Text="• voice preset&#x0a;• one background loop sound&#x0a;• several one-shot sounds&#x0a;• scene mixer settings" />
                         </StackPanel>

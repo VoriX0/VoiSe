@@ -1,5 +1,17 @@
-# Gate 5.18 — SoundBoard Red Debug & Wheel Trace
+# Gate 5.21 — SoundBoard Wide Track List
 
-This diagnostic gate keeps the full red debug overlay and adds root-level mouse wheel tracing/routing to investigate the remaining scroll issue in fullscreen.
+This gate changes the SoundBoard body layout to avoid the problematic track-list scroll area entirely.
 
-The SoundBoard head was also adjusted: the timeline group and transport block are now lifted upward together while keeping their bottom edges aligned.
+## Layout
+
+- Left column: 25% width, category controls and category selector.
+- Middle gap: 5% width.
+- Right column: 70% width, track list.
+- The track list has no dedicated/internal vertical scrolling.
+- Add Track / Delete Track are placed in the left control column below the category selector.
+
+## Notes
+
+- The successful Head alignment from the previous gates is preserved.
+- The previous window-level mouse wheel routing hacks were removed.
+- Double-clicking a track still starts playback.

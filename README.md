@@ -1,10 +1,10 @@
-# VoiSe Gate 5.20 — SoundBoard Window Wheel Fix
+# VoiSe Gate 5.21 — SoundBoard Wide Track List
 
-Gate 5.20 keeps the corrected SoundBoard head layout, removes debug borders, and tries a different fix for the fullscreen scrolling problem.
+Gate 5.21 keeps the corrected SoundBoard head layout, removes debug borders, and tries a different fix for the fullscreen scrolling problem.
 
 ## Changes
 
-- Window/header version updated to Gate 5.20.
+- Window/header version updated to Gate 5.21.
 - Debug borders are removed.
 - SoundBoard head blocks are raised again: `Previous / Next / Stop` and `Play / Timeline / Time` are aligned like in the last good head version.
 - SoundBoard body spacing is tightened so the track list starts directly after `Add Track / Delete Track` again.
@@ -26,3 +26,12 @@ dotnet run --project src/VoiSe.App
 3. In fullscreen, mouse wheel scrolling works over the actual track list area, including below the 4th track.
 4. Settings log scrolling works in the lower part of the log area.
 5. Double-clicking a track starts playback.
+
+
+## Gate 5.21 changes
+
+- Redesigns SoundBoard body: left 25% for category controls and category selector, 5% gap, right 70% for the track list.
+- Removes separate/internal track-list scrolling.
+- Moves Add Track / Delete Track into the left control column below the category selector.
+- Removes the previous window-level wheel routing hacks that caused shifted scroll zones in fullscreen.
+- Keeps the successful Head alignment from the previous gate.
