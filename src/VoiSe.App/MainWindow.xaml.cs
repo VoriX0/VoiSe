@@ -46,6 +46,8 @@ public sealed partial class MainWindow : Window
     private IntPtr _windowHandle;
     private const int WhMouseLl = 14;
     private const int WmMouseWheel = 0x020A;
+    private const double SoundWheelZoneShiftLeftRatio = 0.30;
+    private const double SoundWheelZoneShiftDownRatio = 0.30;
 
     public MainWindow()
     {
@@ -74,7 +76,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.31 UI started.");
+        AppendLog("Gate 5.32 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -96,20 +98,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.31 restore started.");
+            StartupLog.Write("Gate 5.32 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.31 scalar settings applied.");
+            StartupLog.Write("Gate 5.32 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.31 restore completed.");
+            StartupLog.Write("Gate 5.32 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.31 restore error: " + ex);
+            StartupLog.Write("Gate 5.32 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -210,18 +212,27 @@ public sealed partial class MainWindow : Window
         var xDip = clientPoint.X / scale;
         var yDip = clientPoint.Y / scale;
 
-        if (RootGrid is null || xDip < 0 || yDip < 0 || xDip > RootGrid.ActualWidth || yDip > RootGrid.ActualHeight)
+        if (RootGrid is null)
         {
             return false;
         }
 
-        // Gate 5.31: the wheel zone intentionally covers the whole SoundBoard tab
-        // below the TabView tab headers, not just the visual Sounds list. This avoids
-        // the shifted WinUI wheel hit-test region seen in fullscreen mode.
+        // Gate 5.32: temporary calibration for the fullscreen wheel hit-test mismatch.
+        // The user observed that the working wheel zone is visually displaced from the
+        // Sounds list. Move the effective wheel zone 30% left and 30% down.
         var tabTop = SoundBoardTabRoot.TransformToVisual(RootGrid)
             .TransformPoint(new Windows.Foundation.Point(0, 0))
             .Y;
-        if (yDip < tabTop)
+        var usableHeight = Math.Max(1.0, RootGrid.ActualHeight - tabTop);
+        var shiftedX = xDip + RootGrid.ActualWidth * SoundWheelZoneShiftLeftRatio;
+        var shiftedY = yDip - usableHeight * SoundWheelZoneShiftDownRatio;
+
+        if (shiftedX < 0 || shiftedY < 0 || shiftedX > RootGrid.ActualWidth || shiftedY > RootGrid.ActualHeight)
+        {
+            return false;
+        }
+
+        if (shiftedY < tabTop)
         {
             return false;
         }
@@ -234,7 +245,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateSoundInputOverlayBounds()
     {
-        // Gate 5.31: SoundInputOverlay is now placed directly inside SoundListArea.
+        // Gate 5.32: SoundInputOverlay is still placed directly inside SoundListArea.
         // It stretches with the Sounds list, so no window-level coordinate transform is used.
         if (SoundInputOverlay is null || MainTabView is null)
         {
