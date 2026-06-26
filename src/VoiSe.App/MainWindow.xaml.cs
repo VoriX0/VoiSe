@@ -49,9 +49,7 @@ public sealed partial class MainWindow : Window
         _library = _libraryStore.Load();
         InitializeComponent();
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
-        SoundBoardTabRoot.SizeChanged += (_, _) => UpdateSoundInputOverlayBounds();
-        SoundListArea.SizeChanged += (_, _) => UpdateSoundInputOverlayBounds();
-        MainContentHost.SizeChanged += (_, _) => UpdateSoundInputOverlayBounds();
+        SoundInputOverlay.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundInputOverlayPointerWheelChanged), true);
         Closed += OnClosed;
         Activated += OnActivated;
 
@@ -68,7 +66,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.29 UI started.");
+        AppendLog("Gate 5.30 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -90,20 +88,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.29 restore started.");
+            StartupLog.Write("Gate 5.30 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.29 scalar settings applied.");
+            StartupLog.Write("Gate 5.30 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.29 restore completed.");
+            StartupLog.Write("Gate 5.30 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.29 restore error: " + ex);
+            StartupLog.Write("Gate 5.30 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -145,29 +143,16 @@ public sealed partial class MainWindow : Window
 
     private void UpdateSoundInputOverlayBounds()
     {
-        if (SoundInputOverlay is null || SoundListArea is null || MainContentHost is null || MainTabView is null)
+        // Gate 5.30: SoundInputOverlay is now placed directly inside SoundListArea.
+        // It stretches with the Sounds list, so no window-level coordinate transform is used.
+        if (SoundInputOverlay is null || MainTabView is null)
         {
             return;
         }
 
-        if (MainTabView.SelectedIndex != 0 || SoundListArea.ActualWidth <= 1 || SoundListArea.ActualHeight <= 1)
-        {
-            SoundInputOverlay.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        try
-        {
-            var point = SoundListArea.TransformToVisual(MainContentHost).TransformPoint(new Windows.Foundation.Point(0, 0));
-            SoundInputOverlay.Margin = new Thickness(point.X, point.Y, 0, 0);
-            SoundInputOverlay.Width = SoundListArea.ActualWidth;
-            SoundInputOverlay.Height = SoundListArea.ActualHeight;
-            SoundInputOverlay.Visibility = Visibility.Visible;
-        }
-        catch
-        {
-            SoundInputOverlay.Visibility = Visibility.Collapsed;
-        }
+        SoundInputOverlay.Visibility = MainTabView.SelectedIndex == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void OnSoundInputOverlayPointerWheelChanged(object sender, PointerRoutedEventArgs e)

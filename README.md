@@ -1,41 +1,17 @@
-# VoiSe Gate 5.29 — SoundBoard Input Overlay Fix
+# VoiSe Gate 5.30 — SoundBoard Local Input Overlay
 
-Gate 5.29 keeps the current SoundBoard design, but changes the way input is handled for the right-side Sounds list.
-
-## Why this gate exists
-
-In Gate 5.28 the same problem affected three actions at once:
-
-- mouse wheel did not work in the real lower/right part of the Sounds list;
-- double-click did not start a sound;
-- right-click context menu did not open.
-
-That points to a shifted WinUI hit-test/input area rather than to separate bugs in scroll, double-click, or context menu code.
+This Gate keeps the Gate 5.25/5.29 visual design, but moves the invisible Sounds input overlay directly into the same layout cell as the visible Sounds list.
 
 ## Changes
 
-- Visual design is preserved.
-- The right-side Sounds list still uses the custom visual scroller.
-- Added an invisible input overlay placed exactly over the visual Sounds list.
-- The overlay handles:
-  - wheel scrolling;
-  - single-click selection;
-  - manual double-click playback;
-  - right-click context menu.
-- Removed the previous window-level `WM_MOUSEWHEEL` routing hack.
-- Reduced wheel step for smoother scrolling.
-- Window/header version updated to Gate 5.29.
+- Window title/header updated to Gate 5.30.
+- The Sounds input overlay is no longer positioned by TransformToVisual/Margin.
+- The overlay now stretches locally over the Sounds list, so its hit-test/wheel zone should not drift left/up in fullscreen.
+- Wheel handling remains smooth and manual.
+- Double-click Play and right-click context menu from Gate 5.29 are preserved.
 
 ## Run
 
 ```powershell
 dotnet run --project src/VoiSe.App
 ```
-
-## Check
-
-1. Open SoundBoard.
-2. Scroll while the cursor is over the lower/right part of the Sounds list.
-3. Double-click a sound row; it should start playback.
-4. Right-click a sound row; the context menu should open.
-5. Visual layout should remain the same as Gate 5.28.

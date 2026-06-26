@@ -1,1 +1,1 @@
-Gate 5.29 - SoundBoard Input Overlay Fix
+Gate 5.30 - SoundBoard Local Input Overlay
