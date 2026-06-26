@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 6.12 - Settings Log Fullscreen">
+    Title="VoiSe Gate 6.13 - Logs Button and Playing Title">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 6.12" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Settings log polish and preset JSON export" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 6.13" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="Logs button and SoundBoard playing title" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -432,7 +432,7 @@
                     <Grid Padding="0,16,0,0" RowSpacing="12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
-                            <RowDefinition Height="55" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <Border Grid.Row="0" Padding="4">
@@ -470,32 +470,14 @@
                             </ScrollViewer>
                         </Border>
 
-                        <Border Grid.Row="1" Padding="4">
-                            <Grid x:Name="SettingsLogArea" RowSpacing="6" Background="Transparent">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Log" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Content="Open fullscreen" Padding="10,2" MinHeight="24" Click="OnOpenLogFullscreenClick" />
-                                </Grid>
-                                <TextBox Grid.Row="1"
-                                         x:Name="LogTextBox"
-                                         IsReadOnly="True"
-                                         AcceptsReturn="True"
-                                         TextWrapping="Wrap"
-                                         Background="Transparent"
-                                         VerticalAlignment="Stretch"
-                                         HorizontalAlignment="Stretch"
-                                         ScrollViewer.VerticalScrollBarVisibility="Visible"
-                                         ScrollViewer.VerticalScrollMode="Enabled"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                         ScrollViewer.HorizontalScrollMode="Disabled" />
+                        <Border Grid.Row="1" Padding="4,8,4,0">
+                            <Grid x:Name="SettingsLogArea" ColumnSpacing="8" Background="Transparent">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Open logs" Padding="14,6" MinHeight="32" Click="OnOpenLogFullscreenClick" />
+                                <TextBlock Grid.Column="1" Text="Application log opens in a separate window." VerticalAlignment="Center" Opacity="0.7" />
                             </Grid>
                         </Border>
                     </Grid>

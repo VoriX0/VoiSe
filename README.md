@@ -1,6 +1,6 @@
-# VoiSe Gate 6.12 — Settings Log Fullscreen
+# VoiSe Gate 6.13 — Logs Button and Playing Title
 
-Gate 6.12 keeps the working Gate 6.8 / 6.5 SoundBoard wheel behavior and the Gate 6.10/6.11 Voice Changer scroll behavior.
+Gate 6.13 keeps the working Gate 6.8 / 6.5 SoundBoard wheel behavior and the Gate 6.10/6.11 Voice Changer scroll behavior.
 
 ## What changed
 

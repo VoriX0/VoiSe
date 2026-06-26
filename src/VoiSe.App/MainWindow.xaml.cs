@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.ApplicationModel.DataTransfer;
@@ -30,7 +31,7 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<VoicePreset> _voicePresets = Array.Empty<VoicePreset>();
     private bool _loadingVoicePreset;
     private bool _syncingVoiceControls;
-    private ScrollViewer? _logInnerScrollViewer;
+    private readonly StringBuilder _logBuffer = new();
     private readonly DispatcherTimer _voiceSettingsApplyTimer;
     private Gate2UnifiedAudioEngine? _engine;
     private string? _soundFilePath;
@@ -47,6 +48,7 @@ public sealed partial class MainWindow : Window
     private string _trackSearchText = string.Empty;
     private List<SoundBoardSound> _visibleSounds = new();
     private string? _lastSoundRowClickSoundId;
+    private string? _currentSoundDisplayName;
     private DateTime _lastSoundRowClickUtc = DateTime.MinValue;
     private LowLevelMouseProc? _lowLevelMouseProc;
     private IntPtr _mouseHookHandle;
@@ -93,7 +95,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.12 UI started.");
+        AppendLog("Gate 6.13 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -115,21 +117,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.12 restore started.");
+            StartupLog.Write("Gate 6.13 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.12 scalar settings applied.");
+            StartupLog.Write("Gate 6.13 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.12 restore completed.");
+            StartupLog.Write("Gate 6.13 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.12 restore error: " + ex);
+            StartupLog.Write("Gate 6.13 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -255,7 +257,7 @@ public sealed partial class MainWindow : Window
         {
             0 => IsPointInSoundBoardWheelZone(xDip, yDip) && TryScrollSoundOverlay(delta),
             1 => IsPointInVoiceChangerWheelZone(yDip) && TryScrollVoiceChanger(delta),
-            3 => IsPointInSettingsLogWheelZone(yDip) && TryScrollSettingsLog(delta),
+            3 => false,
             _ => false
         };
     }
@@ -288,14 +290,6 @@ public sealed partial class MainWindow : Window
         // below RootGrid.ActualHeight. Voice Changer used to be clipped at
         // RootGrid.ActualHeight, which created a dead lower area in fullscreen.
         return IsPointInExtendedVerticalWheelZone(VoiceChangerScrollViewer, yDip);
-    }
-
-    private bool IsPointInSettingsLogWheelZone(double yDip)
-    {
-        // Gate 6.12: keep the log wheel zone compact. It starts at the actual
-        // LogTextBox and extends only about two log-box heights, so it does not
-        // steal wheel events from the Settings controls above.
-        return IsPointInCompactElementWheelZone(LogTextBox, yDip, 2.0);
     }
 
     private bool IsPointInExtendedVerticalWheelZone(FrameworkElement? element, double yDip)
@@ -358,49 +352,41 @@ public sealed partial class MainWindow : Window
         return true;
     }
 
-    private bool TryScrollSettingsLog(int wheelDelta)
-    {
-        if (LogTextBox is null || wheelDelta == 0)
-        {
-            return false;
-        }
-
-        _logInnerScrollViewer ??= FindDescendantScrollViewer(LogTextBox);
-        if (_logInnerScrollViewer is null)
-        {
-            return false;
-        }
-
-        var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
-        var step = 42.0 * notches;
-        var target = _logInnerScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
-        target = Math.Max(0, Math.Min(_logInnerScrollViewer.ScrollableHeight, target));
-        _logInnerScrollViewer.ChangeView(null, target, null, disableAnimation: false);
-        return true;
-    }
-
     private async void OnOpenLogFullscreenClick(object sender, RoutedEventArgs e)
     {
         try
         {
-            var logBox = new TextBox
+            var logText = _logBuffer.ToString();
+            if (string.IsNullOrWhiteSpace(logText))
             {
-                Text = LogTextBox?.Text ?? string.Empty,
-                IsReadOnly = true,
-                AcceptsReturn = true,
+                logText = "No log entries yet.";
+            }
+
+            var textBlock = new TextBlock
+            {
+                Text = logText,
                 TextWrapping = TextWrapping.Wrap,
-                Width = Math.Max(900, RootGrid?.ActualWidth * 0.82 ?? 900),
-                Height = Math.Max(560, RootGrid?.ActualHeight * 0.78 ?? 560)
+                FontFamily = new FontFamily("Consolas"),
+                FontSize = 13,
+                IsTextSelectionEnabled = true
             };
-            ScrollViewer.SetVerticalScrollBarVisibility(logBox, ScrollBarVisibility.Visible);
-            ScrollViewer.SetVerticalScrollMode(logBox, ScrollMode.Enabled);
-            ScrollViewer.SetHorizontalScrollBarVisibility(logBox, ScrollBarVisibility.Disabled);
-            ScrollViewer.SetHorizontalScrollMode(logBox, ScrollMode.Disabled);
+
+            var scrollViewer = new ScrollViewer
+            {
+                Content = textBlock,
+                Width = Math.Max(900, RootGrid?.ActualWidth * 0.82 ?? 900),
+                Height = Math.Max(560, RootGrid?.ActualHeight * 0.78 ?? 560),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
+                VerticalScrollMode = ScrollMode.Enabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollMode = ScrollMode.Disabled,
+                ZoomMode = ZoomMode.Disabled
+            };
 
             var dialog = new ContentDialog
             {
                 Title = "Application log",
-                Content = logBox,
+                Content = scrollViewer,
                 CloseButtonText = "Close",
                 DefaultButton = ContentDialogButton.Close,
                 XamlRoot = ((FrameworkElement)Content).XamlRoot
@@ -410,7 +396,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            AppendLog($"Open fullscreen log error: {ex.Message}");
+            AppendLog($"Open logs error: {ex.Message}");
         }
     }
 
@@ -1420,6 +1406,7 @@ public sealed partial class MainWindow : Window
             var delayMs = (int)Math.Round(SoundVirtualDelaySlider.Value);
             var virtualVolume = (float)SoundVirtualVolumeSlider.Value;
             var monitorVolume = (float)SoundMonitorVolumeSlider.Value;
+            _currentSoundDisplayName = _selectedSound?.DisplayName ?? System.IO.Path.GetFileNameWithoutExtension(soundPath);
             _engine.PlaySound(soundPath, virtualVolume, monitorVolume, delayMs);
             if (_selectedSound is not null)
             {
@@ -1437,6 +1424,7 @@ public sealed partial class MainWindow : Window
     private void OnStopSoundClick(object sender, RoutedEventArgs e)
     {
         _engine?.StopSound();
+        _currentSoundDisplayName = null;
         UpdateTimeline();
         AppendLog("Sound stopped.");
     }
@@ -1641,9 +1629,17 @@ public sealed partial class MainWindow : Window
         }
 
         TotalTimeTextBlock.Text = FormatTime(status.DurationSeconds);
-        TransportStatusTextBlock.Text = status.IsActive
-            ? (status.IsPaused ? "Paused" : "Playing")
-            : "No sound";
+        if (status.IsActive)
+        {
+            var title = string.IsNullOrWhiteSpace(_currentSoundDisplayName) ? "sound" : _currentSoundDisplayName;
+            TransportStatusTextBlock.Text = status.IsPaused
+                ? $"paused: {title}"
+                : $"playing: {title}";
+        }
+        else
+        {
+            TransportStatusTextBlock.Text = "No sound";
+        }
         PlayPauseButton.Content = status.IsActive && !status.IsPaused ? "\uE769" : "\uE768";
         TimelineHost.Opacity = status.IsActive ? 1.0 : 0.45;
     }
@@ -2291,21 +2287,11 @@ public sealed partial class MainWindow : Window
     private void AppendLog(string message)
     {
         var line = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        LogTextBox.Text = string.IsNullOrEmpty(LogTextBox.Text)
-            ? line
-            : LogTextBox.Text + Environment.NewLine + line;
-
-        DispatcherQueue.TryEnqueue(() =>
+        if (_logBuffer.Length > 0)
         {
-            _logInnerScrollViewer ??= FindDescendantScrollViewer(LogTextBox);
-            if (_logInnerScrollViewer is not null)
-            {
-                _logInnerScrollViewer.ChangeView(null, _logInnerScrollViewer.ScrollableHeight, null, disableAnimation: true);
-            }
-            else
-            {
-                LogTextBox.Select(LogTextBox.Text.Length, 0);
-            }
-        });
+            _logBuffer.AppendLine();
+        }
+
+        _logBuffer.Append(line);
     }
 }
