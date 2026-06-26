@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VoiSe.Audio;
 using Windows.Storage.Pickers;
@@ -40,6 +41,11 @@ public sealed partial class MainWindow : Window
     private List<SoundBoardSound> _visibleSounds = new();
     private string? _lastSoundRowClickSoundId;
     private DateTime _lastSoundRowClickUtc = DateTime.MinValue;
+    private LowLevelMouseProc? _lowLevelMouseProc;
+    private IntPtr _mouseHookHandle;
+    private IntPtr _windowHandle;
+    private const int WhMouseLl = 14;
+    private const int WmMouseWheel = 0x020A;
 
     public MainWindow()
     {
@@ -48,8 +54,10 @@ public sealed partial class MainWindow : Window
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
+        _windowHandle = WindowNative.GetWindowHandle(this);
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         SoundInputOverlay.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundInputOverlayPointerWheelChanged), true);
+        InstallSoundBoardWheelHook();
         Closed += OnClosed;
         Activated += OnActivated;
 
@@ -66,7 +74,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.30 UI started.");
+        AppendLog("Gate 5.31 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -88,20 +96,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.30 restore started.");
+            StartupLog.Write("Gate 5.31 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.30 scalar settings applied.");
+            StartupLog.Write("Gate 5.31 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.30 restore completed.");
+            StartupLog.Write("Gate 5.31 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.30 restore error: " + ex);
+            StartupLog.Write("Gate 5.31 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -141,9 +149,92 @@ public sealed partial class MainWindow : Window
         UpdateSoundInputOverlayBounds();
     }
 
+    private void InstallSoundBoardWheelHook()
+    {
+        try
+        {
+            _lowLevelMouseProc = LowLevelMouseHookProc;
+            _mouseHookHandle = SetWindowsHookEx(WhMouseLl, _lowLevelMouseProc, GetModuleHandle(null), 0);
+            if (_mouseHookHandle == IntPtr.Zero)
+            {
+                AppendLog("Mouse wheel hook was not installed; local SoundBoard wheel handling remains active.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Mouse wheel hook error: {ex.Message}");
+        }
+    }
+
+    private IntPtr LowLevelMouseHookProc(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0 && wParam.ToInt32() == WmMouseWheel)
+        {
+            try
+            {
+                if (TryHandleFullTabSoundWheel(lParam))
+                {
+                    return new IntPtr(1);
+                }
+            }
+            catch
+            {
+                // Never let the diagnostic wheel hook break normal mouse input.
+            }
+        }
+
+        return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
+    }
+
+    private bool TryHandleFullTabSoundWheel(IntPtr lParam)
+    {
+        if (MainTabView?.SelectedIndex != 0 || _windowHandleIsUnavailable())
+        {
+            return false;
+        }
+
+        var foreground = GetForegroundWindow();
+        if (foreground != _windowHandle)
+        {
+            return false;
+        }
+
+        var hookData = Marshal.PtrToStructure<MouseLowLevelHookStruct>(lParam);
+        var clientPoint = hookData.Point;
+        if (!ScreenToClient(_windowHandle, ref clientPoint))
+        {
+            return false;
+        }
+
+        var scale = RootGrid?.XamlRoot?.RasterizationScale ?? 1.0;
+        var xDip = clientPoint.X / scale;
+        var yDip = clientPoint.Y / scale;
+
+        if (RootGrid is null || xDip < 0 || yDip < 0 || xDip > RootGrid.ActualWidth || yDip > RootGrid.ActualHeight)
+        {
+            return false;
+        }
+
+        // Gate 5.31: the wheel zone intentionally covers the whole SoundBoard tab
+        // below the TabView tab headers, not just the visual Sounds list. This avoids
+        // the shifted WinUI wheel hit-test region seen in fullscreen mode.
+        var tabTop = SoundBoardTabRoot.TransformToVisual(RootGrid)
+            .TransformPoint(new Windows.Foundation.Point(0, 0))
+            .Y;
+        if (yDip < tabTop)
+        {
+            return false;
+        }
+
+        var delta = unchecked((short)((hookData.MouseData >> 16) & 0xffff));
+        return delta != 0 && TryScrollSoundOverlay(delta);
+    }
+
+    private bool _windowHandleIsUnavailable() => _windowHandle == IntPtr.Zero;
+
     private void UpdateSoundInputOverlayBounds()
     {
-        // Gate 5.30: SoundInputOverlay is now placed directly inside SoundListArea.
+        // Gate 5.31: SoundInputOverlay is now placed directly inside SoundListArea.
         // It stretches with the Sounds list, so no window-level coordinate transform is used.
         if (SoundInputOverlay is null || MainTabView is null)
         {
@@ -173,7 +264,7 @@ public sealed partial class MainWindow : Window
 
         // Smaller step than the native 120px-style jumps: about one row per wheel notch.
         var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
-        var step = 22.0 * notches;
+        var step = 14.0 * notches;
         var target = SoundOverlayScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
         target = Math.Max(0, Math.Min(SoundOverlayScrollViewer.ScrollableHeight, target));
         SoundOverlayScrollViewer.ChangeView(null, target, null, disableAnimation: false);
@@ -260,6 +351,43 @@ public sealed partial class MainWindow : Window
         return null;
     }
 
+    private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseLowLevelHookStruct
+    {
+        public NativePoint Point;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr GetModuleHandle(string? lpModuleName);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool ScreenToClient(IntPtr hWnd, ref NativePoint lpPoint);
+
     private void UpdateBottomPanelVisibility()
     {
         // Gate 5.6: no shared bottom panel. Kept as a no-op for older call sites.
@@ -271,6 +399,11 @@ public sealed partial class MainWindow : Window
         SaveCurrentSettings();
         StopEngine(log: false);
         _timelineTimer.Stop();
+        if (_mouseHookHandle != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_mouseHookHandle);
+            _mouseHookHandle = IntPtr.Zero;
+        }
         _catalog.Dispose();
     }
 
