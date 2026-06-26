@@ -34,10 +34,18 @@ public sealed class VoiSeUserSettings
     public double VoiceFormant { get; set; } = 0.0;
     public double VoiceGate { get; set; } = 0.0;
     public double VoiceCompressor { get; set; } = 0.0;
-    public double VoiceCompressionRatio { get; set; } = 0.0;
-    public double VoiceLimiter { get; set; } = 0.0;
+    public double VoiceCompressionRatio { get; set; } = 0.0; // legacy / ignored from Gate 6.2+
+    public double VoiceLimiter { get; set; } = 0.0; // legacy / ignored from Gate 6.2+
     public double VoiceRobot { get; set; } = 0.0;
     public double VoiceRadio { get; set; } = 0.0;
     public double VoiceReverb { get; set; } = 0.0;
-    public double VoiceBrightness { get; set; } = 0.0;
+    public double VoiceBrightness { get; set; } = 0.0; // legacy / ignored from Gate 6.2+
+
+    // Gate 6.3 connected DSP controls.
+    public double VoiceBass { get; set; } = 0.0;
+    public double VoiceTreble { get; set; } = 0.0;
+    public double VoiceDistortion { get; set; } = 0.0;
+    public double VoiceTremolo { get; set; } = 0.0;
+    public double VoiceEcho { get; set; } = 0.0;
+    public double VoiceBitCrusher { get; set; } = 0.0;
 }

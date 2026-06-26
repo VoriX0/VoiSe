@@ -1,6 +1,6 @@
-# VoiSe Gate 6.2 — Voice Active Sliders
+# VoiSe Gate 6.3 — Voice Connected Effects
 
-Gate 6.2 keeps the Gate 6 preset workflow, but removes Voice Changer sliders that are not wired to the current DSP yet.
+Gate 6.3 expands the Voice Changer tab with connected real-time DSP sliders.
 
 ## Run
 
@@ -8,42 +8,29 @@ Gate 6.2 keeps the Gate 6 preset workflow, but removes Voice Changer sliders tha
 dotnet run --project src/VoiSe.App
 ```
 
-## Changes
+## New active voice sliders
 
-- Window title/version updated to **VoiSe Gate 6.2**.
-- SoundBoard wheel catch zone expanded:
-  - +40% to the right compared with Gate 6.1 tuning;
-  - +35% downward compared with Gate 6.1 tuning.
-- Voice Changer work area has extra right padding so the vertical scrollbar does not cover controls.
-- Sounds list content also has extra right padding so its scrollbar does not cover rows.
-- Voice Changer now shows only active sliders:
-  - `Voice Gain`;
-  - `Gate`;
-  - `Compressor`.
-- Removed inactive current UI sliders:
-  - `Input Gain`;
-  - `Pitch`;
-  - `Formant`;
-  - `Compression Ratio`;
-  - `Limiter`;
-  - `Robot`;
-  - `Radio`;
-  - `Reverb`;
-  - `Brightness`.
-- Preset capture/recreate now writes only active slider values.
-- Fresh `Default.json` in `%LOCALAPPDATA%\VoiSe\presets\` now contains only active sliders.
-- Compressor slider is mapped more aggressively: one slider now controls both compression threshold and internal ratio.
+- Voice Gain
+- Gate
+- Compressor
+- Bass
+- Treble
+- Distortion
+- Robot
+- Tremolo
+- Echo
+- Reverb
+- Radio
+- Bit Crusher
 
-## Preset folder
+Sliders remain -100..+100. Numeric boxes can store -9999..+9999; the real-time DSP clamps extreme values internally to keep the audio path stable.
+
+## Presets
+
+New and recreated presets now save all active Gate 6.3 sliders as separate JSON files in:
 
 ```powershell
 %LOCALAPPDATA%\VoiSe\presets\
 ```
 
-A fresh preset folder starts with only:
-
-```text
-Default.json
-```
-
-Existing exchanged presets with old keys still load; unsupported keys are ignored by the Gate 6.2 UI.
+Existing older presets still load; missing new slider keys simply keep the current/default slider values.
