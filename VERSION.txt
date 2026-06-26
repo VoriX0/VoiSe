@@ -1,1 +1,1 @@
-Gate 5.28 - SoundBoard Global Wheel Fix
+Gate 5.29 - SoundBoard Input Overlay Fix

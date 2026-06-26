@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 5.28 - SoundBoard Global Wheel Fix">
+    Title="VoiSe Gate 5.29 - SoundBoard Input Overlay Fix">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 5.28" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="SoundBoard global wheel routing for sound list" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 5.29" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="SoundBoard input overlay for Sounds list" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -34,8 +34,9 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Padding="4">
-            <TabView x:Name="MainTabView" IsAddTabButtonVisible="False" TabWidthMode="Equal">
+        <Grid Grid.Row="1" x:Name="MainContentHost">
+            <Border Padding="4">
+                <TabView x:Name="MainTabView" IsAddTabButtonVisible="False" TabWidthMode="Equal">
                 <TabViewItem Header="SoundBoard" IsClosable="False">
                     <Grid x:Name="SoundBoardTabRoot" Background="Transparent" Padding="0,16,0,0" RowSpacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <Grid.RowDefinitions>
@@ -205,7 +206,7 @@
                                             VerticalAlignment="Stretch"
                                             HorizontalAlignment="Stretch">
                                         <Grid Background="Transparent">
-                                            <!-- Gate 5.28: custom overlay scroller. WM_MOUSEWHEEL routes the whole SoundBoard window area to this list. -->
+                                            <!-- Gate 5.29: visual scroller; input is handled by SoundInputOverlay above it. -->
                                             <ScrollViewer x:Name="SoundOverlayScrollViewer"
                                                           VerticalScrollBarVisibility="Auto"
                                                           VerticalScrollMode="Enabled"
@@ -325,7 +326,19 @@
                         </Border>
                     </Grid>
                 </TabViewItem>
-            </TabView>
-        </Border>
+                </TabView>
+            </Border>
+
+            <!-- Invisible input layer placed over the visual Sounds list only.
+                 It avoids the shifted WinUI hit-test zone observed in fullscreen. -->
+            <Border x:Name="SoundInputOverlay"
+                    Background="#01000000"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Visibility="Collapsed"
+                    Canvas.ZIndex="1000"
+                    PointerPressed="OnSoundInputOverlayPointerPressed"
+                    PointerWheelChanged="OnSoundInputOverlayPointerWheelChanged" />
+        </Grid>
 </Grid>
 </Window>
