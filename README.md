@@ -1,15 +1,16 @@
-# VoiSe Gate 6.11 — Settings Log and Preset Export
+# VoiSe Gate 6.12 — Settings Log Fullscreen
 
-Gate 6.11 keeps the working Gate 6.8 / Gate 6.5 SoundBoard wheel behavior and the extended Voice Changer scroll fix from Gate 6.10.
+Gate 6.12 keeps the working Gate 6.8 / 6.5 SoundBoard wheel behavior and the Gate 6.10/6.11 Voice Changer scroll behavior.
 
 ## What changed
 
 - SoundBoard scroll logic is unchanged from the working Gate 6.8/6.5 calibration.
 - Voice Changer scroll remains extended down to the bottom fullscreen area.
-- Settings log area is reduced to half height.
-- Settings log wheel zone now starts at the actual log textbox instead of the whole log panel, so it should not steal wheel events from the Settings controls above it.
-- Voice preset context menu now has **Copy JSON file**.
-- **Copy JSON file** copies the preset `.json` file to the Windows clipboard as a file, so it can be pasted/sent quickly in apps that accept files from clipboard.
+- Voice Changer sliders are now grouped 4 per row instead of 3 per row.
+- Settings log window height is reduced again.
+- Settings log wheel zone is compact and starts from the actual log textbox, so it should not steal wheel events from Settings controls above.
+- Added **Open fullscreen** button for the Settings log.
+- Preset context menu still includes **Copy JSON file** for quick sharing.
 
 ## Run
 

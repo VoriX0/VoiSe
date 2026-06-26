@@ -93,7 +93,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.11 UI started.");
+        AppendLog("Gate 6.12 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -115,21 +115,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.11 restore started.");
+            StartupLog.Write("Gate 6.12 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.11 scalar settings applied.");
+            StartupLog.Write("Gate 6.12 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.11 restore completed.");
+            StartupLog.Write("Gate 6.12 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.11 restore error: " + ex);
+            StartupLog.Write("Gate 6.12 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -292,10 +292,10 @@ public sealed partial class MainWindow : Window
 
     private bool IsPointInSettingsLogWheelZone(double yDip)
     {
-        // Gate 6.11: keep Settings log scrolling extended downward, but start the
-        // log wheel zone at the actual log TextBox. This prevents the log handler
-        // from stealing wheel events from the Settings controls above it.
-        return IsPointInExtendedVerticalWheelZone(LogTextBox, yDip);
+        // Gate 6.12: keep the log wheel zone compact. It starts at the actual
+        // LogTextBox and extends only about two log-box heights, so it does not
+        // steal wheel events from the Settings controls above.
+        return IsPointInCompactElementWheelZone(LogTextBox, yDip, 2.0);
     }
 
     private bool IsPointInExtendedVerticalWheelZone(FrameworkElement? element, double yDip)
@@ -308,6 +308,19 @@ public sealed partial class MainWindow : Window
         var top = GetElementTopDip(element);
         var usableHeight = Math.Max(1.0, RootGrid.ActualHeight - top);
         var bottom = RootGrid.ActualHeight + usableHeight * SoundWheelZoneExpandBottomRatio;
+        return yDip >= top && yDip <= bottom;
+    }
+
+    private bool IsPointInCompactElementWheelZone(FrameworkElement? element, double yDip, double heightMultiplier)
+    {
+        if (RootGrid is null || element is null)
+        {
+            return false;
+        }
+
+        var top = GetElementTopDip(element);
+        var elementHeight = Math.Max(1.0, element.ActualHeight);
+        var bottom = top + elementHeight * Math.Max(1.0, heightMultiplier);
         return yDip >= top && yDip <= bottom;
     }
 
@@ -364,6 +377,41 @@ public sealed partial class MainWindow : Window
         target = Math.Max(0, Math.Min(_logInnerScrollViewer.ScrollableHeight, target));
         _logInnerScrollViewer.ChangeView(null, target, null, disableAnimation: false);
         return true;
+    }
+
+    private async void OnOpenLogFullscreenClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var logBox = new TextBox
+            {
+                Text = LogTextBox?.Text ?? string.Empty,
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                Width = Math.Max(900, RootGrid?.ActualWidth * 0.82 ?? 900),
+                Height = Math.Max(560, RootGrid?.ActualHeight * 0.78 ?? 560)
+            };
+            ScrollViewer.SetVerticalScrollBarVisibility(logBox, ScrollBarVisibility.Visible);
+            ScrollViewer.SetVerticalScrollMode(logBox, ScrollMode.Enabled);
+            ScrollViewer.SetHorizontalScrollBarVisibility(logBox, ScrollBarVisibility.Disabled);
+            ScrollViewer.SetHorizontalScrollMode(logBox, ScrollMode.Disabled);
+
+            var dialog = new ContentDialog
+            {
+                Title = "Application log",
+                Content = logBox,
+                CloseButtonText = "Close",
+                DefaultButton = ContentDialogButton.Close,
+                XamlRoot = ((FrameworkElement)Content).XamlRoot
+            };
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Open fullscreen log error: {ex.Message}");
+        }
     }
 
     private static ScrollViewer? FindDescendantScrollViewer(DependencyObject root)
