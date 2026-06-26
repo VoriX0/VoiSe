@@ -51,10 +51,9 @@ public sealed partial class MainWindow : Window
     private IntPtr _windowHandle;
     private const int WhMouseLl = 14;
     private const int WmMouseWheel = 0x020A;
-    private const double SoundWheelZoneWidthRatio = 3.00;
-    private const double SoundWheelZoneHeightRatio = 3.00;
-    private const double SoundWheelZoneCenterOffsetXRatio = -0.40;
-    private const double SoundWheelZoneCenterOffsetYRatio = 0.30;
+    private const double SoundWheelZoneExpandUpRatio = 0.25;
+    private const double SoundWheelZoneExpandRightRatio = 2.00;
+    private const double SoundWheelZoneExpandBottomRatio = 1.60;
     private const double VoiceValueMin = -9999.0;
     private const double VoiceValueMax = 9999.0;
 
@@ -92,7 +91,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.7 UI started.");
+        AppendLog("Gate 6.8 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -114,21 +113,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.7 restore started.");
+            StartupLog.Write("Gate 6.8 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.7 scalar settings applied.");
+            StartupLog.Write("Gate 6.8 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.7 restore completed.");
+            StartupLog.Write("Gate 6.8 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.7 restore error: " + ex);
+            StartupLog.Write("Gate 6.8 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -202,7 +201,7 @@ public sealed partial class MainWindow : Window
         {
             try
             {
-                if (TryHandleFullTabSoundWheel(lParam))
+                if (TryHandleMainTabWheel(lParam))
                 {
                     return new IntPtr(1);
                 }
@@ -216,9 +215,9 @@ public sealed partial class MainWindow : Window
         return CallNextHookEx(_mouseHookHandle, nCode, wParam, lParam);
     }
 
-    private bool TryHandleFullTabSoundWheel(IntPtr lParam)
+    private bool TryHandleMainTabWheel(IntPtr lParam)
     {
-        if (MainTabView?.SelectedIndex != 0 || _windowHandleIsUnavailable())
+        if (MainTabView is null || _windowHandleIsUnavailable())
         {
             return false;
         }
@@ -236,46 +235,89 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
+        if (RootGrid is null)
+        {
+            return false;
+        }
+
+        var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
+        var xDip = clientPoint.X / scale;
+        var yDip = clientPoint.Y / scale;
+        var delta = unchecked((short)((hookData.MouseData >> 16) & 0xffff));
+        if (delta == 0)
+        {
+            return false;
+        }
+
+        return MainTabView.SelectedIndex switch
+        {
+            0 => IsPointInSoundBoardWheelZone(xDip, yDip) && TryScrollSoundOverlay(delta),
+            1 => IsPointBelowSelectedTabContent(yDip) && TryScrollVoiceChanger(delta),
+            _ => false
+        };
+    }
+
+    private bool IsPointInSoundBoardWheelZone(double xDip, double yDip)
+    {
         if (RootGrid is null || SoundBoardTabRoot is null)
         {
             return false;
         }
 
-        if (!GetClientRect(_windowHandle, out var clientRect))
-        {
-            return false;
-        }
-
-        var clientWidth = Math.Max(1.0, clientRect.Right - clientRect.Left);
-        var clientHeight = Math.Max(1.0, clientRect.Bottom - clientRect.Top);
-        var scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
-
-        // Gate 6.7: keep the oversized SoundBoard wheel zone, but calibrate its
-        // center left/down from the true window center. This compensates for the
-        // observed WinUI hit-zone offset while keeping the zone clipped below
-        // the tab selector.
-        var tabContentTopDip = SoundBoardTabRoot.TransformToVisual(RootGrid)
+        // Gate 6.8: keep the known-good Gate 6.5 / Gate 5.34 SoundBoard wheel calibration.
+        // Gate 6.6 changed this to a centered client-pixel zone and broke the SoundBoard scroll area.
+        var tabTop = SoundBoardTabRoot.TransformToVisual(RootGrid)
             .TransformPoint(new Windows.Foundation.Point(0, 0))
             .Y;
-        var tabContentTopPx = Math.Max(0.0, tabContentTopDip * scale);
+        var usableHeight = Math.Max(1.0, RootGrid.ActualHeight - tabTop);
 
-        var centerX = clientWidth * (0.5 + SoundWheelZoneCenterOffsetXRatio);
-        var centerY = clientHeight * (0.5 + SoundWheelZoneCenterOffsetYRatio);
-        var zoneWidth = clientWidth * SoundWheelZoneWidthRatio;
-        var zoneHeight = clientHeight * SoundWheelZoneHeightRatio;
+        var zoneLeft = 0.0;
+        var zoneTop = Math.Max(tabTop, tabTop - usableHeight * SoundWheelZoneExpandUpRatio);
+        var zoneRight = RootGrid.ActualWidth * (1.0 + SoundWheelZoneExpandRightRatio);
+        var zoneBottom = RootGrid.ActualHeight + usableHeight * SoundWheelZoneExpandBottomRatio;
 
-        var zoneLeft = Math.Max(0.0, centerX - zoneWidth / 2.0);
-        var zoneTop = Math.Max(tabContentTopPx, centerY - zoneHeight / 2.0);
-        var zoneRight = Math.Min(clientWidth, centerX + zoneWidth / 2.0);
-        var zoneBottom = Math.Min(clientHeight, centerY + zoneHeight / 2.0);
+        return xDip >= zoneLeft && xDip <= zoneRight && yDip >= zoneTop && yDip <= zoneBottom;
+    }
 
-        if (clientPoint.X < zoneLeft || clientPoint.X > zoneRight || clientPoint.Y < zoneTop || clientPoint.Y > zoneBottom)
+    private bool IsPointBelowSelectedTabContent(double yDip)
+    {
+        if (RootGrid is null || MainTabView is null)
         {
             return false;
         }
 
-        var delta = unchecked((short)((hookData.MouseData >> 16) & 0xffff));
-        return delta != 0 && TryScrollSoundOverlay(delta);
+        FrameworkElement? selectedRoot = MainTabView.SelectedIndex switch
+        {
+            0 => SoundBoardTabRoot,
+            1 => VoiceChangerScrollViewer,
+            _ => null
+        };
+
+        if (selectedRoot is null)
+        {
+            return false;
+        }
+
+        var top = selectedRoot.TransformToVisual(RootGrid)
+            .TransformPoint(new Windows.Foundation.Point(0, 0))
+            .Y;
+
+        return yDip >= top && yDip <= RootGrid.ActualHeight;
+    }
+
+    private bool TryScrollVoiceChanger(int wheelDelta)
+    {
+        if (VoiceChangerScrollViewer is null || wheelDelta == 0)
+        {
+            return false;
+        }
+
+        var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
+        var step = 42.0 * notches;
+        var target = VoiceChangerScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
+        target = Math.Max(0, Math.Min(VoiceChangerScrollViewer.ScrollableHeight, target));
+        VoiceChangerScrollViewer.ChangeView(null, target, null, disableAnimation: false);
+        return true;
     }
 
     private bool _windowHandleIsUnavailable() => _windowHandle == IntPtr.Zero;
@@ -409,15 +451,6 @@ public sealed partial class MainWindow : Window
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct NativeRect
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     private struct MouseLowLevelHookStruct
     {
         public NativePoint Point;
@@ -444,9 +477,6 @@ public sealed partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool ScreenToClient(IntPtr hWnd, ref NativePoint lpPoint);
-
-    [DllImport("user32.dll")]
-    private static extern bool GetClientRect(IntPtr hWnd, out NativeRect lpRect);
 
     private void UpdateBottomPanelVisibility()
     {
