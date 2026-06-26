@@ -46,6 +46,7 @@ public sealed partial class MainWindow : Window
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
+        SoundBoardTabRoot.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundBoardPointerWheelChanged), true);
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         Closed += OnClosed;
         Activated += OnActivated;
@@ -63,7 +64,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 5.26 UI started.");
+        AppendLog("Gate 5.27 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -85,20 +86,20 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 5.26 restore started.");
+            StartupLog.Write("Gate 5.27 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 5.26 scalar settings applied.");
+            StartupLog.Write("Gate 5.27 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 5.26 restore completed.");
+            StartupLog.Write("Gate 5.27 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 5.26 restore error: " + ex);
+            StartupLog.Write("Gate 5.27 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -135,7 +136,28 @@ public sealed partial class MainWindow : Window
 
     private void OnMainTabSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Gate 5.26: current SoundBoard design with a custom overlay sound scroller.
+        // Gate 5.27: current SoundBoard design with a custom overlay sound scroller.
+    }
+
+    private void OnSoundBoardPointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        if (SoundOverlayScrollViewer is null)
+        {
+            return;
+        }
+
+        var delta = e.GetCurrentPoint(SoundBoardTabRoot).Properties.MouseWheelDelta;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        // Gate 5.27: the whole SoundBoard tab acts as a wheel zone,
+        // but only the sound list scrolls. This avoids the shifted hit-test
+        // area we saw in fullscreen mode. Positive delta means wheel up.
+        var newOffset = Math.Max(0, SoundOverlayScrollViewer.VerticalOffset - delta);
+        SoundOverlayScrollViewer.ChangeView(null, newOffset, null, disableAnimation: true);
+        e.Handled = true;
     }
 
     private void UpdateBottomPanelVisibility()
@@ -332,7 +354,10 @@ public sealed partial class MainWindow : Window
                 ? Microsoft.UI.ColorHelper.FromArgb(0x28, 0xFF, 0xFF, 0xFF)
                 : Microsoft.UI.ColorHelper.FromArgb(0x00, 0x00, 0x00, 0x00)),
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            ContextFlyout = CreateSoundContextFlyout()
+            ContextFlyout = CreateSoundContextFlyout(),
+            IsTapEnabled = true,
+            IsDoubleTapEnabled = true,
+            IsRightTapEnabled = true
         };
 
         var text = new TextBlock
@@ -446,7 +471,7 @@ public sealed partial class MainWindow : Window
 
     private void OnSoundSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // Gate 5.26: the ListView was replaced with a custom overlay scroller.
+        // Gate 5.27: the ListView was replaced with a custom overlay scroller.
     }
 
     private async void OnAddSoundClick(object sender, RoutedEventArgs e)
@@ -629,12 +654,12 @@ public sealed partial class MainWindow : Window
 
     private void OnSoundListRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
-        // Gate 5.26: kept for compatibility with older XAML packages.
+        // Gate 5.27: kept for compatibility with older XAML packages.
     }
 
     private void OnSoundListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        // Gate 5.26: kept for compatibility with older XAML packages.
+        // Gate 5.27: kept for compatibility with older XAML packages.
     }
 
     private void OnSoundRowTapped(object sender, TappedRoutedEventArgs e)
@@ -642,7 +667,6 @@ public sealed partial class MainWindow : Window
         if (sender is FrameworkElement { Tag: SoundBoardSound sound })
         {
             SelectSound(sound);
-            e.Handled = true;
         }
     }
 
