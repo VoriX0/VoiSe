@@ -9,6 +9,7 @@ public sealed class SimpleVoiceProcessor
     private const int PitchBufferSamples = 8192;                          // ~170 ms per channel at 48 kHz
     private const int PitchMinDelaySamples = 256;                         // ~5 ms safety delay
     private const int PitchDepthSamples = 2048;                           // ~43 ms pitch-shift grain depth
+    private const int FormantBandCount = 4;
 
     private readonly object _sync = new();
     private EffectSettings _settings;
@@ -18,6 +19,7 @@ public sealed class SimpleVoiceProcessor
     private float _voiceGain;
     private float _limiterCeiling;
     private float _pitchSemitones;
+    private float _formantShiftSemitones;
     private float _bassAmount;
     private float _trebleAmount;
     private float _distortionAmount;
@@ -30,6 +32,14 @@ public sealed class SimpleVoiceProcessor
     private float _alienAmount;
 
     private readonly float[] _toneLow = new float[Channels];
+    private readonly float[,] _formantZ1 = new float[Channels, FormantBandCount];
+    private readonly float[,] _formantZ2 = new float[Channels, FormantBandCount];
+    private readonly float[] _formantB0 = new float[FormantBandCount];
+    private readonly float[] _formantB1 = new float[FormantBandCount];
+    private readonly float[] _formantB2 = new float[FormantBandCount];
+    private readonly float[] _formantA1 = new float[FormantBandCount];
+    private readonly float[] _formantA2 = new float[FormantBandCount];
+    private readonly float[] _formantWeights = { 0.75f, 0.95f, 0.70f, 0.45f };
     private readonly float[] _radioLow = new float[Channels];
     private readonly float[] _radioBand = new float[Channels];
     private readonly float[] _bitHeld = new float[Channels];
@@ -72,6 +82,7 @@ public sealed class SimpleVoiceProcessor
         float voiceGain;
         float limiterCeiling;
         float pitchSemitones;
+        float formantShiftSemitones;
         float bassAmount;
         float trebleAmount;
         float distortionAmount;
@@ -92,6 +103,7 @@ public sealed class SimpleVoiceProcessor
             voiceGain = _voiceGain;
             limiterCeiling = _limiterCeiling;
             pitchSemitones = _pitchSemitones;
+            formantShiftSemitones = _formantShiftSemitones;
             bassAmount = _bassAmount;
             trebleAmount = _trebleAmount;
             distortionAmount = _distortionAmount;
@@ -146,6 +158,7 @@ public sealed class SimpleVoiceProcessor
             }
 
             sample = ApplyPitchShift(sample, channel, pitchSemitones);
+            sample = ApplyFormantShift(sample, channel, formantShiftSemitones);
             sample = ApplyTone(sample, channel, bassGain, trebleGain, toneBlend);
             sample = ApplyRadio(sample, channel, radioMix);
             sample = ApplyRobot(sample, robotMix);
@@ -179,6 +192,8 @@ public sealed class SimpleVoiceProcessor
         _voiceGain = Decibels.DbToLinear(settings.VoiceGainDb);
         _limiterCeiling = Decibels.DbToLinear(settings.LimiterCeilingDb);
         _pitchSemitones = Math.Clamp(settings.PitchSemitones, -24.0f, 24.0f);
+        _formantShiftSemitones = Math.Clamp(settings.FormantShiftSemitones, -24.0f, 24.0f);
+        UpdateFormantCoefficients(_formantShiftSemitones);
         _bassAmount = ClampEffectAmount(settings.BassAmount);
         _trebleAmount = ClampEffectAmount(settings.TrebleAmount);
         _distortionAmount = ClampEffectAmount(settings.DistortionAmount);
@@ -286,6 +301,69 @@ public sealed class SimpleVoiceProcessor
 
         var frac = readPosition - index0;
         return buffer[index0] * (1.0f - frac) + buffer[index1] * frac;
+    }
+
+
+    private void UpdateFormantCoefficients(float semitones)
+    {
+        // A compact vocal-tract model: four band-pass resonators approximate
+        // voice formant areas. The slider moves these resonances independently
+        // from the pitch shifter, so it is audibly different from Bass/Treble.
+        ReadOnlySpan<float> baseFrequencies = stackalloc float[] { 520.0f, 1450.0f, 2450.0f, 3400.0f };
+        ReadOnlySpan<float> qValues = stackalloc float[] { 4.2f, 5.2f, 5.0f, 4.4f };
+        var shift = MathF.Pow(2.0f, semitones / 12.0f);
+
+        for (var band = 0; band < FormantBandCount; band++)
+        {
+            var frequency = Math.Clamp(baseFrequencies[band] * shift, 90.0f, SampleRate * 0.45f);
+            var q = qValues[band];
+            var omega = 2.0f * MathF.PI * frequency / SampleRate;
+            var sin = MathF.Sin(omega);
+            var cos = MathF.Cos(omega);
+            var alpha = sin / (2.0f * q);
+            var a0 = 1.0f + alpha;
+
+            _formantB0[band] = alpha / a0;
+            _formantB1[band] = 0.0f;
+            _formantB2[band] = -alpha / a0;
+            _formantA1[band] = -2.0f * cos / a0;
+            _formantA2[band] = (1.0f - alpha) / a0;
+        }
+    }
+
+    private float ApplyFormantShift(float sample, int channel, float semitones)
+    {
+        if (Math.Abs(semitones) <= 0.01f)
+        {
+            return sample;
+        }
+
+        var formantSum = 0.0f;
+        var weightSum = 0.0f;
+        for (var band = 0; band < FormantBandCount; band++)
+        {
+            var resonated = ProcessFormantBand(sample, channel, band);
+            var weight = _formantWeights[band];
+            formantSum += resonated * weight;
+            weightSum += weight;
+        }
+
+        var model = weightSum > 0.001f ? formantSum / weightSum : sample;
+        model = MathF.Tanh(model * 3.0f + sample * 0.35f);
+
+        // At +/-100 the formant model is strong but not fully wet, which keeps
+        // speech intelligible and avoids runaway resonances. Numeric fields can
+        // push harder, but the amount is clamped for safety.
+        var mix = Math.Clamp(Math.Abs(semitones) / 12.0f, 0.0f, 1.0f) * 0.82f;
+        return Lerp(sample, model, mix);
+    }
+
+    private float ProcessFormantBand(float input, int channel, int band)
+    {
+        var output = _formantB0[band] * input + _formantZ1[channel, band];
+        _formantZ1[channel, band] = _formantB1[band] * input - _formantA1[band] * output + _formantZ2[channel, band];
+        _formantZ2[channel, band] = _formantB2[band] * input - _formantA2[band] * output;
+        return output;
     }
 
     private float ApplyTone(float sample, int channel, float bassGain, float trebleGain, float toneBlend)

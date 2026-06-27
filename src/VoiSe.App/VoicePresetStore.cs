@@ -23,6 +23,7 @@ public sealed class VoicePresetStore
     "Gate": -100,
     "Compressor": 100,
     "Pitch": 0,
+    "Formant": 0,
     "Bass": 0,
     "Treble": 0,
     "Distortion": 0,

@@ -12,6 +12,7 @@ public sealed class EffectSettings
 
     // Gate 6.5 connected DSP controls. PitchSemitones is clamped in the UI/DSP path.
     public float PitchSemitones { get; set; } = 0.0f;
+    public float FormantShiftSemitones { get; set; } = 0.0f;
     public float BassAmount { get; set; } = 0.0f;
     public float TrebleAmount { get; set; } = 0.0f;
     public float DistortionAmount { get; set; } = 0.0f;

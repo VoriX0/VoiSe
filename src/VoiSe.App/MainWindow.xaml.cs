@@ -95,7 +95,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.13 UI started.");
+        AppendLog("Gate 6.14 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -117,21 +117,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.13 restore started.");
+            StartupLog.Write("Gate 6.14 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.13 scalar settings applied.");
+            StartupLog.Write("Gate 6.14 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.13 restore completed.");
+            StartupLog.Write("Gate 6.14 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.13 restore error: " + ex);
+            StartupLog.Write("Gate 6.14 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -153,6 +153,7 @@ public sealed partial class MainWindow : Window
         SetVoiceControl(GateThresholdSlider, GateThresholdValueBox, _settings.VoiceGate);
         SetVoiceControl(CompressorThresholdSlider, CompressorThresholdValueBox, _settings.VoiceCompressor);
         SetVoiceControl(PitchSlider, PitchValueBox, _settings.VoicePitch);
+        SetVoiceControl(FormantSlider, FormantValueBox, _settings.VoiceFormant);
         SetVoiceControl(BassSlider, BassValueBox, _settings.VoiceBass);
         SetVoiceControl(TrebleSlider, TrebleValueBox, _settings.VoiceTreble);
         SetVoiceControl(DistortionSlider, DistortionValueBox, _settings.VoiceDistortion);
@@ -1328,6 +1329,7 @@ public sealed partial class MainWindow : Window
             CompressorThresholdDb = (float)MapCentered(compressorValue, -24, -60, -6),
             CompressorRatio = (float)MapCentered(compressorValue, 4, 1.5, 16),
             PitchSemitones = ToPitchSemitones(GetVoiceValue(PitchSlider, PitchValueBox)),
+            FormantShiftSemitones = ToFormantSemitones(GetVoiceValue(FormantSlider, FormantValueBox)),
             BassAmount = ToEffectAmount(GetVoiceValue(BassSlider, BassValueBox)),
             TrebleAmount = ToEffectAmount(GetVoiceValue(TrebleSlider, TrebleValueBox)),
             DistortionAmount = ToEffectAmount(GetVoiceValue(DistortionSlider, DistortionValueBox)),
@@ -1351,6 +1353,13 @@ public sealed partial class MainWindow : Window
     {
         // Slider -100..+100 maps to +/-12 semitones. Numeric boxes may go
         // further, but the real-time shifter is clamped to +/-24 semitones.
+        return (float)Clamp(value / 100.0 * 12.0, -24.0, 24.0);
+    }
+
+    private static float ToFormantSemitones(double value)
+    {
+        // Formant is intentionally separate from Bass/Treble: it shifts the vocal
+        // resonance model up/down while Pitch changes perceived note height.
         return (float)Clamp(value / 100.0 * 12.0, -24.0, 24.0);
     }
 
@@ -2005,6 +2014,7 @@ public sealed partial class MainWindow : Window
                 ["Gate"] = GetVoiceValue(GateThresholdSlider, GateThresholdValueBox),
                 ["Compressor"] = GetVoiceValue(CompressorThresholdSlider, CompressorThresholdValueBox),
                 ["Pitch"] = GetVoiceValue(PitchSlider, PitchValueBox),
+                ["Formant"] = GetVoiceValue(FormantSlider, FormantValueBox),
                 ["Bass"] = GetVoiceValue(BassSlider, BassValueBox),
                 ["Treble"] = GetVoiceValue(TrebleSlider, TrebleValueBox),
                 ["Distortion"] = GetVoiceValue(DistortionSlider, DistortionValueBox),
@@ -2028,6 +2038,7 @@ public sealed partial class MainWindow : Window
             SetVoiceControlFromPreset(GateThresholdSlider, GateThresholdValueBox, preset, "Gate");
             SetVoiceControlFromPreset(CompressorThresholdSlider, CompressorThresholdValueBox, preset, "Compressor");
             SetVoiceControlFromPreset(PitchSlider, PitchValueBox, preset, "Pitch");
+            SetVoiceControlFromPreset(FormantSlider, FormantValueBox, preset, "Formant");
             SetVoiceControlFromPreset(BassSlider, BassValueBox, preset, "Bass");
             SetVoiceControlFromPreset(TrebleSlider, TrebleValueBox, preset, "Treble");
             SetVoiceControlFromPreset(DistortionSlider, DistortionValueBox, preset, "Distortion");
@@ -2096,6 +2107,7 @@ public sealed partial class MainWindow : Window
         if (slider == GateThresholdSlider) return GateThresholdValueBox;
         if (slider == CompressorThresholdSlider) return CompressorThresholdValueBox;
         if (slider == PitchSlider) return PitchValueBox;
+        if (slider == FormantSlider) return FormantValueBox;
         if (slider == BassSlider) return BassValueBox;
         if (slider == TrebleSlider) return TrebleValueBox;
         if (slider == DistortionSlider) return DistortionValueBox;
@@ -2115,6 +2127,7 @@ public sealed partial class MainWindow : Window
         if (textBox == GateThresholdValueBox) return GateThresholdSlider;
         if (textBox == CompressorThresholdValueBox) return CompressorThresholdSlider;
         if (textBox == PitchValueBox) return PitchSlider;
+        if (textBox == FormantValueBox) return FormantSlider;
         if (textBox == BassValueBox) return BassSlider;
         if (textBox == TrebleValueBox) return TrebleSlider;
         if (textBox == DistortionValueBox) return DistortionSlider;
@@ -2196,6 +2209,7 @@ public sealed partial class MainWindow : Window
         GateThresholdLabel.Text = "Gate";
         CompressorThresholdLabel.Text = "Compressor";
         PitchLabel.Text = "Pitch";
+        FormantLabel.Text = "Formant";
         BassLabel.Text = "Bass";
         TrebleLabel.Text = "Treble";
         DistortionLabel.Text = "Distortion";
@@ -2265,6 +2279,7 @@ public sealed partial class MainWindow : Window
         _settings.VoiceGate = GetVoiceValue(GateThresholdSlider, GateThresholdValueBox);
         _settings.VoiceCompressor = GetVoiceValue(CompressorThresholdSlider, CompressorThresholdValueBox);
         _settings.VoicePitch = GetVoiceValue(PitchSlider, PitchValueBox);
+        _settings.VoiceFormant = GetVoiceValue(FormantSlider, FormantValueBox);
         _settings.VoiceBass = GetVoiceValue(BassSlider, BassValueBox);
         _settings.VoiceTreble = GetVoiceValue(TrebleSlider, TrebleValueBox);
         _settings.VoiceDistortion = GetVoiceValue(DistortionSlider, DistortionValueBox);
