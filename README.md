@@ -1,14 +1,24 @@
-# VoiSe Gate 6.20 — Preset Import Tools
+# VoiSe Gate 7.0 — Scenes Foundation
 
-Gate 6.20 is the final Gate 6 polish pass before Scenes.
+Gate 7 starts the Scenes feature.
 
-Added to Voice Changer presets:
+A scene now captures and restores:
 
-- a combined tools tile after New preset;
-- top half: Import preset JSON;
-- bottom half: open presets folder;
-- imported presets are copied into `%LOCALAPPDATA%\VoiSe\presets\`;
-- existing Gate 6.19 hotkey capture UX is preserved.
+- current Voice Changer slider values;
+- last applied voice preset name when available;
+- Voice Monitor On/Off;
+- selected SoundBoard category;
+- selected SoundBoard sound;
+- Virtual Mic Master;
+- SoundBoard → Virtual Mic volume;
+- SoundBoard → Headphones volume;
+- SoundBoard virtual mic delay.
+
+Scenes are stored as separate JSON files in:
+
+```text
+%LOCALAPPDATA%\VoiSe\scenes\
+```
 
 Run:
 

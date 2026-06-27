@@ -27,9 +27,13 @@ public sealed partial class MainWindow : Window
     private readonly SettingsStore _settingsStore = new();
     private readonly SoundBoardLibraryStore _libraryStore;
     private readonly VoicePresetStore _voicePresetStore;
+    private readonly SceneStore _sceneStore;
     private VoiSeUserSettings _settings;
     private SoundBoardLibrary _library;
     private IReadOnlyList<VoicePreset> _voicePresets = Array.Empty<VoicePreset>();
+    private IReadOnlyList<VoiSeScene> _scenes = Array.Empty<VoiSeScene>();
+    private VoiSeScene? _selectedScene;
+    private string? _lastAppliedVoicePresetName;
     private bool _loadingVoicePreset;
     private bool _syncingVoiceControls;
     private readonly StringBuilder _logBuffer = new();
@@ -78,6 +82,7 @@ public sealed partial class MainWindow : Window
         _settings = _settingsStore.Load();
         _libraryStore = new SoundBoardLibraryStore(_settingsStore.DataDirectory);
         _voicePresetStore = new VoicePresetStore(_settingsStore.DataDirectory);
+        _sceneStore = new SceneStore(_settingsStore.DataDirectory);
         _library = _libraryStore.Load();
         InitializeComponent();
         _windowHandle = WindowNative.GetWindowHandle(this);
@@ -107,7 +112,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.20 UI started.");
+        AppendLog("Gate 7.0 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -129,21 +134,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.20 restore started.");
+            StartupLog.Write("Gate 7.0 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.20 scalar settings applied.");
+            StartupLog.Write("Gate 7.0 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.20 restore completed.");
+            StartupLog.Write("Gate 7.0 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.20 restore error: " + ex);
+            StartupLog.Write("Gate 7.0 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -2277,6 +2282,10 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateVoiceSettingLabels();
+        if (!_loadingVoicePreset && !_loadingSettings)
+        {
+            _lastAppliedVoicePresetName = null;
+        }
         ScheduleVoiceSettingsApply();
     }
 
@@ -2438,6 +2447,348 @@ public sealed partial class MainWindow : Window
         if (double.IsNaN(seconds) || seconds < 0) seconds = 0;
         var span = TimeSpan.FromSeconds(seconds);
         return span.TotalHours >= 1 ? span.ToString(@"h\:mm\:ss") : span.ToString(@"mm\:ss");
+    }
+
+
+    private void LoadScenesIntoUi()
+    {
+        try
+        {
+            var selectedId = _selectedScene?.Id;
+            _scenes = _sceneStore.LoadScenes();
+            if (ScenesListView is not null)
+            {
+                ScenesListView.ItemsSource = _scenes;
+                var nextSelection = _scenes.FirstOrDefault(scene => scene.Id == selectedId) ?? _scenes.FirstOrDefault();
+                ScenesListView.SelectedItem = nextSelection;
+                _selectedScene = nextSelection;
+            }
+
+            UpdateSceneDetails();
+            AppendLog($"Scenes loaded: {_scenes.Count}. Folder: {_sceneStore.ScenesDirectory}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scenes load error: {ex.Message}");
+        }
+    }
+
+    private void OnSceneSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        _selectedScene = ScenesListView?.SelectedItem as VoiSeScene;
+        UpdateSceneDetails();
+    }
+
+    private void UpdateSceneDetails()
+    {
+        var hasScene = _selectedScene is not null;
+        if (SceneApplyButton is not null) SceneApplyButton.IsEnabled = hasScene;
+        if (SceneUpdateButton is not null) SceneUpdateButton.IsEnabled = hasScene;
+        if (SceneRenameButton is not null) SceneRenameButton.IsEnabled = hasScene;
+        if (SceneDeleteButton is not null) SceneDeleteButton.IsEnabled = hasScene;
+
+        if (SceneDetailsTitleTextBlock is null || SceneDetailsTextBlock is null)
+        {
+            return;
+        }
+
+        if (_selectedScene is null)
+        {
+            SceneDetailsTitleTextBlock.Text = "Scene details";
+            SceneDetailsTextBlock.Text = "No scene selected. Capture the current VoiSe state to create your first scene.";
+            return;
+        }
+
+        SceneDetailsTitleTextBlock.Text = _selectedScene.Name;
+        SceneDetailsTextBlock.Text = CreateSceneDetailsText(_selectedScene);
+    }
+
+    private string CreateSceneDetailsText(VoiSeScene scene)
+    {
+        var voicePreset = string.IsNullOrWhiteSpace(scene.VoicePresetName) ? "embedded slider state" : scene.VoicePresetName;
+        var category = string.IsNullOrWhiteSpace(scene.SoundCategoryName) ? "—" : scene.SoundCategoryName;
+        var background = string.IsNullOrWhiteSpace(scene.BackgroundSoundName) ? "—" : scene.BackgroundSoundName;
+        var oneShots = scene.OneShotSoundIds?.Count ?? 0;
+
+        return
+            $"Voice: {voicePreset}\n" +
+            $"Voice monitor: {(scene.VoiceMonitorEnabled ? "On" : "Off")}\n" +
+            $"SoundBoard category: {category}\n" +
+            $"Background / selected sound: {background}\n" +
+            $"One-shot sound slots: {oneShots}\n\n" +
+            $"Virtual Mic Master: {(int)Math.Round(scene.VirtualMicMasterVolume * 100)}%\n" +
+            $"SoundBoard → Virtual Mic: {(int)Math.Round(scene.SoundBoardVirtualMicVolume * 100)}%\n" +
+            $"SoundBoard → Headphones: {(int)Math.Round(scene.SoundBoardHeadphonesVolume * 100)}%\n" +
+            $"SoundBoard Virtual Mic Delay: {(int)Math.Round(scene.SoundBoardVirtualMicDelayMs)} ms\n\n" +
+            $"Updated: {scene.UpdatedAtUtc.ToLocalTime():yyyy-MM-dd HH:mm}";
+    }
+
+    private async void OnCaptureSceneClick(object sender, RoutedEventArgs e)
+    {
+        var name = await ShowTextDialogAsync("Capture current scene", "Scene name", "New Scene");
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return;
+        }
+
+        try
+        {
+            var scene = CaptureCurrentScene(name.Trim());
+            _sceneStore.SaveScene(scene);
+            _selectedScene = scene;
+            LoadScenesIntoUi();
+            SelectSceneById(scene.Id);
+            AppendLog($"Scene captured: {scene.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene capture error: {ex.Message}");
+        }
+    }
+
+    private void OnApplySceneClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedScene is null)
+        {
+            AppendLog("Select a scene to apply.");
+            return;
+        }
+
+        ApplyScene(_selectedScene);
+    }
+
+    private void OnUpdateSceneClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedScene is null)
+        {
+            AppendLog("Select a scene to update.");
+            return;
+        }
+
+        try
+        {
+            var updated = CaptureCurrentScene(_selectedScene.Name);
+            updated.Id = _selectedScene.Id;
+            updated.Icon = _selectedScene.Icon;
+            updated.CreatedAtUtc = _selectedScene.CreatedAtUtc;
+            updated.FilePath = _selectedScene.FilePath;
+            _sceneStore.OverwriteScene(updated);
+            _selectedScene = updated;
+            LoadScenesIntoUi();
+            SelectSceneById(updated.Id);
+            AppendLog($"Scene updated from current state: {updated.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene update error: {ex.Message}");
+        }
+    }
+
+    private async void OnRenameSceneClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedScene is null)
+        {
+            AppendLog("Select a scene to rename.");
+            return;
+        }
+
+        var newName = await ShowTextDialogAsync("Rename scene", "Scene name", _selectedScene.Name);
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        try
+        {
+            var id = _selectedScene.Id;
+            _sceneStore.RenameScene(_selectedScene, newName.Trim());
+            LoadScenesIntoUi();
+            SelectSceneById(id);
+            AppendLog($"Scene renamed: {newName.Trim()}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene rename error: {ex.Message}");
+        }
+    }
+
+    private async void OnDeleteSceneClick(object sender, RoutedEventArgs e)
+    {
+        if (_selectedScene is null)
+        {
+            AppendLog("Select a scene to delete.");
+            return;
+        }
+
+        var scene = _selectedScene;
+        var dialog = new ContentDialog
+        {
+            Title = "Delete scene",
+            Content = $"Delete scene '{scene.Name}'? The JSON file will be removed from the scenes folder.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = ((FrameworkElement)Content).XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        try
+        {
+            _sceneStore.DeleteScene(scene);
+            _selectedScene = null;
+            LoadScenesIntoUi();
+            AppendLog($"Scene deleted: {scene.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene delete error: {ex.Message}");
+        }
+    }
+
+    private void OnOpenScenesFolderClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(_sceneStore.ScenesDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _sceneStore.ScenesDirectory,
+                UseShellExecute = true
+            });
+            AppendLog($"Scenes folder opened: {_sceneStore.ScenesDirectory}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Open scenes folder error: {ex.Message}");
+        }
+    }
+
+    private VoiSeScene CaptureCurrentScene(string name)
+    {
+        var category = CurrentCategory;
+        var sound = _selectedSound;
+        return new VoiSeScene
+        {
+            Name = name,
+            VoicePresetName = _lastAppliedVoicePresetName,
+            VoiceSliders = CaptureCurrentVoicePreset(name).Sliders,
+            VoiceMonitorEnabled = _voiceMonitorEnabled,
+            SoundCategoryId = category?.Id,
+            SoundCategoryName = category?.Name,
+            BackgroundSoundId = sound?.Id,
+            BackgroundSoundName = sound?.DisplayName,
+            VirtualMicMasterVolume = VirtualOutputVolumeSlider?.Value ?? 1.0,
+            SoundBoardVirtualMicVolume = SoundVirtualVolumeSlider?.Value ?? 1.0,
+            SoundBoardHeadphonesVolume = SoundMonitorVolumeSlider?.Value ?? 1.0,
+            SoundBoardVirtualMicDelayMs = SoundVirtualDelaySlider?.Value ?? 85.0
+        };
+    }
+
+    private void ApplyScene(VoiSeScene scene)
+    {
+        try
+        {
+            VirtualOutputVolumeSlider.Value = Clamp(scene.VirtualMicMasterVolume, 0, 1.5);
+            SoundVirtualVolumeSlider.Value = Clamp(scene.SoundBoardVirtualMicVolume, 0, 1.5);
+            SoundMonitorVolumeSlider.Value = Clamp(scene.SoundBoardHeadphonesVolume, 0, 1.5);
+            SoundVirtualDelaySlider.Value = Clamp(scene.SoundBoardVirtualMicDelayMs, 0, 300);
+            _voiceMonitorEnabled = scene.VoiceMonitorEnabled;
+            UpdateVoiceMonitorButton();
+
+            ApplyVoiceSliderDictionary(scene.VoiceSliders);
+            _lastAppliedVoicePresetName = scene.VoicePresetName;
+
+            var category = PickCategory(scene.SoundCategoryId)
+                ?? _library.Categories.FirstOrDefault(c => string.Equals(c.Name, scene.SoundCategoryName, StringComparison.CurrentCultureIgnoreCase));
+            if (category is not null)
+            {
+                CategoryComboBox.SelectedItem = category;
+                RefreshSoundList();
+            }
+
+            var sound = PickSound(scene.BackgroundSoundId)
+                ?? _library.Sounds.FirstOrDefault(s => string.Equals(s.DisplayName, scene.BackgroundSoundName, StringComparison.CurrentCultureIgnoreCase));
+            if (sound is not null)
+            {
+                var soundCategory = PickCategory(sound.CategoryId);
+                if (soundCategory is not null && !ReferenceEquals(CategoryComboBox.SelectedItem, soundCategory))
+                {
+                    CategoryComboBox.SelectedItem = soundCategory;
+                    RefreshSoundList();
+                }
+
+                SelectSound(sound);
+            }
+
+            UpdateAllLabels();
+            ApplyLiveSettings($"scene applied: {scene.Name}");
+            if (_engine is not null)
+            {
+                _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
+            }
+
+            AppendLog($"Scene applied: {scene.Name}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene apply error: {ex.Message}");
+        }
+    }
+
+    private void ApplyVoiceSliderDictionary(IReadOnlyDictionary<string, double>? sliders)
+    {
+        if (sliders is null)
+        {
+            return;
+        }
+
+        _loadingVoicePreset = true;
+        try
+        {
+            SetVoiceControlFromDictionary(VoiceGainSlider, VoiceGainValueBox, sliders, "VoiceGain");
+            SetVoiceControlFromDictionary(GateThresholdSlider, GateThresholdValueBox, sliders, "Gate");
+            SetVoiceControlFromDictionary(CompressorThresholdSlider, CompressorThresholdValueBox, sliders, "Compressor");
+            SetVoiceControlFromDictionary(PitchSlider, PitchValueBox, sliders, "Pitch");
+            SetVoiceControlFromDictionary(FormantSlider, FormantValueBox, sliders, "Formant");
+            SetVoiceControlFromDictionary(BassSlider, BassValueBox, sliders, "Bass");
+            SetVoiceControlFromDictionary(TrebleSlider, TrebleValueBox, sliders, "Treble");
+            SetVoiceControlFromDictionary(DistortionSlider, DistortionValueBox, sliders, "Distortion");
+            SetVoiceControlFromDictionary(RobotSlider, RobotValueBox, sliders, "Robot");
+            SetVoiceControlFromDictionary(TremoloSlider, TremoloValueBox, sliders, "Tremolo");
+            SetVoiceControlFromDictionary(EchoSlider, EchoValueBox, sliders, "Echo");
+            SetVoiceControlFromDictionary(ReverbSlider, ReverbValueBox, sliders, "Reverb");
+            SetVoiceControlFromDictionary(RadioSlider, RadioValueBox, sliders, "Radio");
+            SetVoiceControlFromDictionary(BitCrusherSlider, BitCrusherValueBox, sliders, "BitCrusher");
+            SetVoiceControlFromDictionary(AlienSlider, AlienValueBox, sliders, "Alien");
+        }
+        finally
+        {
+            _loadingVoicePreset = false;
+        }
+    }
+
+    private void SetVoiceControlFromDictionary(Slider slider, TextBox textBox, IReadOnlyDictionary<string, double> sliders, string key)
+    {
+        if (sliders.TryGetValue(key, out var value))
+        {
+            SetVoiceControl(slider, textBox, value);
+        }
+    }
+
+    private void SelectSceneById(string sceneId)
+    {
+        var scene = _scenes.FirstOrDefault(s => s.Id == sceneId);
+        if (scene is not null && ScenesListView is not null)
+        {
+            ScenesListView.SelectedItem = scene;
+            _selectedScene = scene;
+            UpdateSceneDetails();
+        }
     }
 
     private void LoadVoicePresetsIntoUi()
@@ -2923,6 +3274,7 @@ public sealed partial class MainWindow : Window
         }
 
         UpdateVoiceSettingLabels();
+        _lastAppliedVoicePresetName = preset.Name;
         ApplyLiveSettings($"voice preset applied: {preset.Name}");
     }
 

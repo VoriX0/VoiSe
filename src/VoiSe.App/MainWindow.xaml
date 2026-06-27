@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 6.20 - Preset Import Tools">
+    Title="VoiSe Gate 7.0 - Scenes Foundation">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 6.20" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Global hotkeys for SoundBoard, Voice Changer and transport" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 7.0" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="Scenes: save and restore voice, soundboard and mixer state" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -428,13 +428,69 @@
                 </TabViewItem>
 
                 <TabViewItem Header="Scenes" IsClosable="False">
-                    <Border Padding="4">
-                        <StackPanel Spacing="12" Padding="0,16,0,0">
-                            <InfoBar IsOpen="True" Severity="Informational" Title="Coming next" Message="Scenes are not implemented in Gate 5.28. This tab reserves the final navigation structure from the start." />
-                            <TextBlock Text="Planned scene content:" FontSize="18" FontWeight="SemiBold" />
-                            <TextBlock Text="• voice preset&#x0a;• one background loop sound&#x0a;• several one-shot sounds&#x0a;• scene mixer settings" />
-                        </StackPanel>
-                    </Border>
+                    <Grid x:Name="ScenesTabRoot" Padding="0,16,48,24" RowSpacing="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="Scenes" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="A scene captures the current voice sliders, voice monitor state, selected SoundBoard category/sound, and mixer volumes. Apply it to quickly switch modes." Opacity="0.72" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="Capture current scene" MinWidth="180" Height="44" Click="OnCaptureSceneClick" />
+                        </Grid>
+
+                        <Grid Grid.Row="1" ColumnSpacing="18">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="300" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="10">
+                                <TextBlock Text="Saved scenes" FontSize="18" FontWeight="SemiBold" />
+                                <ListView x:Name="ScenesListView" MinHeight="360" SelectionChanged="OnSceneSelectionChanged">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Spacing="2" Padding="4">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding BackgroundSoundName}" Opacity="0.65" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                                <Grid ColumnSpacing="8" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button Grid.Row="0" Grid.Column="0" x:Name="SceneApplyButton" Content="Apply" HorizontalAlignment="Stretch" Click="OnApplySceneClick" />
+                                    <Button Grid.Row="0" Grid.Column="1" x:Name="SceneUpdateButton" Content="Update" HorizontalAlignment="Stretch" Click="OnUpdateSceneClick" />
+                                    <Button Grid.Row="1" Grid.Column="0" x:Name="SceneRenameButton" Content="Rename" HorizontalAlignment="Stretch" Click="OnRenameSceneClick" />
+                                    <Button Grid.Row="1" Grid.Column="1" x:Name="SceneDeleteButton" Content="Delete" HorizontalAlignment="Stretch" Click="OnDeleteSceneClick" />
+                                    <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Content="Open scenes folder" HorizontalAlignment="Stretch" Click="OnOpenScenesFolderClick" />
+                                </Grid>
+                            </StackPanel>
+
+                            <Border Grid.Column="1" Padding="18" BorderThickness="1" BorderBrush="#33FFFFFF" CornerRadius="8">
+                                <StackPanel Spacing="14">
+                                    <TextBlock x:Name="SceneDetailsTitleTextBlock" Text="Scene details" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="SceneDetailsTextBlock" Text="No scene selected." TextWrapping="Wrap" Opacity="0.82" />
+                                    <InfoBar IsOpen="True" Severity="Informational" Title="Gate 7.0 foundation" Message="This first Scenes gate restores state but does not autoplay background loops yet. Loop layers and multi-sound scene actions come next." />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Grid>
                 </TabViewItem>
 
                 <TabViewItem Header="Settings" IsClosable="False">
