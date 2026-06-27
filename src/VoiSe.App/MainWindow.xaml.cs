@@ -613,8 +613,15 @@ public sealed partial class MainWindow : Window
             var displayName = string.IsNullOrWhiteSpace(sceneButton.LocalName) ? sound.DisplayName : sceneButton.LocalName!.Trim();
             DispatcherQueue.TryEnqueue(() =>
             {
-                SelectSound(sound);
-                PlaySelectedSound();
+                if (sceneButton.IsLooped)
+                {
+                    PlaySoundBoardSound(sound, true, activeScene.LoopedSoundVirtualMicVolume, activeScene.LoopedSoundHeadphonesVolume, "Scene looped sound");
+                }
+                else
+                {
+                    PlaySoundBoardSound(sound, false, activeScene.SceneButtonsVirtualMicVolume, activeScene.SceneButtonsHeadphonesVolume, "Scene sound");
+                }
+
                 AppendLog($"Scene hotkey: {activeScene.Name} / {displayName} [{configured}]");
             });
             return true;
@@ -2218,13 +2225,39 @@ public sealed partial class MainWindow : Window
 
     private void PlaySelectedSound(bool loop = false)
     {
+        var soundPath = _selectedSound?.FilePath ?? _soundFilePath;
+        var displayName = _selectedSound?.DisplayName ?? (string.IsNullOrWhiteSpace(soundPath) ? "Sound" : System.IO.Path.GetFileName(soundPath));
+        PlaySoundPath(
+            soundPath,
+            _selectedSound,
+            displayName,
+            loop,
+            SoundVirtualVolumeSlider?.Value ?? 1.0,
+            SoundMonitorVolumeSlider?.Value ?? 1.0,
+            "Sound");
+    }
+
+    private void PlaySoundBoardSound(SoundBoardSound sound, bool loop, double virtualVolume, double monitorVolume, string sourceLabel)
+    {
+        SelectSound(sound);
+        PlaySoundPath(sound.FilePath, sound, sound.DisplayName, loop, virtualVolume, monitorVolume, sourceLabel);
+    }
+
+    private void PlaySoundPath(
+        string? soundPath,
+        SoundBoardSound? librarySound,
+        string? displayName,
+        bool loop,
+        double virtualVolume,
+        double monitorVolume,
+        string sourceLabel)
+    {
         if (_engine is null)
         {
             AppendLog("Start engine before playing sound.");
             return;
         }
 
-        var soundPath = _selectedSound?.FilePath ?? _soundFilePath;
         if (string.IsNullOrWhiteSpace(soundPath) || !File.Exists(soundPath))
         {
             AppendLog("Choose an existing track from the SoundBoard library first.");
@@ -2235,16 +2268,18 @@ public sealed partial class MainWindow : Window
         {
             SaveCurrentSettings();
             var delayMs = (int)Math.Round(SoundVirtualDelaySlider.Value);
-            var virtualVolume = (float)SoundVirtualVolumeSlider.Value;
-            var monitorVolume = (float)SoundMonitorVolumeSlider.Value;
-            _currentSoundDisplayName = _selectedSound?.DisplayName ?? System.IO.Path.GetFileNameWithoutExtension(soundPath);
-            _engine.PlaySound(soundPath, virtualVolume, monitorVolume, delayMs, loop);
-            if (_selectedSound is not null)
+            var virtualRouteVolume = (float)Clamp(virtualVolume, 0, 1.5);
+            var monitorRouteVolume = (float)Clamp(monitorVolume, 0, 1.5);
+            _currentSoundDisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? System.IO.Path.GetFileNameWithoutExtension(soundPath)
+                : displayName!.Trim();
+            _engine.PlaySound(soundPath, virtualRouteVolume, monitorRouteVolume, delayMs, loop);
+            if (librarySound is not null)
             {
-                _libraryStore.IncrementUsage(_library, _selectedSound);
+                _libraryStore.IncrementUsage(_library, librarySound);
             }
             UpdateBottomStats();
-            AppendLog($"Sound started{(loop ? " in loop" : string.Empty)}: {_selectedSound?.DisplayName ?? System.IO.Path.GetFileName(soundPath)}. Virtual delay: {delayMs} ms.");
+            AppendLog($"{sourceLabel} started{(loop ? " in loop" : string.Empty)}: {_currentSoundDisplayName}. HP: {(int)Math.Round(monitorRouteVolume * 100)}%, Mic: {(int)Math.Round(virtualRouteVolume * 100)}%, Virtual delay: {delayMs} ms.");
         }
         catch (Exception ex)
         {
@@ -2304,6 +2339,38 @@ public sealed partial class MainWindow : Window
         if (_engine is not null)
         {
             _engine.UpdateSoundVolumes((float)SoundVirtualVolumeSlider.Value, (float)SoundMonitorVolumeSlider.Value);
+        }
+    }
+
+    private void OnSceneVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        UpdateSceneVolumeLabels();
+        if (_loadingSceneUi || _selectedScene is null)
+        {
+            return;
+        }
+
+        _selectedScene.LoopedSoundHeadphonesVolume = SceneLoopHeadphonesVolumeSlider?.Value ?? 1.0;
+        _selectedScene.LoopedSoundVirtualMicVolume = SceneLoopVirtualMicVolumeSlider?.Value ?? 1.0;
+        _selectedScene.SceneButtonsHeadphonesVolume = SceneButtonsHeadphonesVolumeSlider?.Value ?? 1.0;
+        _selectedScene.SceneButtonsVirtualMicVolume = SceneButtonsVirtualMicVolumeSlider?.Value ?? 1.0;
+        SaveSelectedSceneVolumeChange();
+    }
+
+    private void SaveSelectedSceneVolumeChange()
+    {
+        if (_selectedScene is null || _loadingSceneUi)
+        {
+            return;
+        }
+
+        try
+        {
+            _sceneStore.OverwriteScene(_selectedScene);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene volume save error: {ex.Message}");
         }
     }
 
@@ -2547,6 +2614,7 @@ public sealed partial class MainWindow : Window
 
         RefreshSceneVoicePresetComboBox();
         RefreshSceneLoopAutostartCheckBox();
+        RefreshSceneVolumeControls();
         RebuildSceneSoundButtons();
     }
 
@@ -2557,6 +2625,10 @@ public sealed partial class MainWindow : Window
         if (SceneVoicePresetCreateButton is not null) SceneVoicePresetCreateButton.IsEnabled = enabled;
         if (SceneVoiceMonitorButton is not null) SceneVoiceMonitorButton.IsEnabled = enabled;
         if (SceneAutostartLoopsCheckBox is not null) SceneAutostartLoopsCheckBox.IsEnabled = enabled;
+        if (SceneLoopHeadphonesVolumeSlider is not null) SceneLoopHeadphonesVolumeSlider.IsEnabled = enabled;
+        if (SceneLoopVirtualMicVolumeSlider is not null) SceneLoopVirtualMicVolumeSlider.IsEnabled = enabled;
+        if (SceneButtonsHeadphonesVolumeSlider is not null) SceneButtonsHeadphonesVolumeSlider.IsEnabled = enabled;
+        if (SceneButtonsVirtualMicVolumeSlider is not null) SceneButtonsVirtualMicVolumeSlider.IsEnabled = enabled;
         RefreshSceneLoopActionButtons();
     }
 
@@ -2601,6 +2673,32 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void RefreshSceneVolumeControls()
+    {
+        if (SceneLoopHeadphonesVolumeSlider is null ||
+            SceneLoopVirtualMicVolumeSlider is null ||
+            SceneButtonsHeadphonesVolumeSlider is null ||
+            SceneButtonsVirtualMicVolumeSlider is null)
+        {
+            return;
+        }
+
+        _loadingSceneUi = true;
+        try
+        {
+            SceneLoopHeadphonesVolumeSlider.Value = Clamp(_selectedScene?.LoopedSoundHeadphonesVolume ?? 1.0, 0, 1.5);
+            SceneLoopVirtualMicVolumeSlider.Value = Clamp(_selectedScene?.LoopedSoundVirtualMicVolume ?? 1.0, 0, 1.5);
+            SceneButtonsHeadphonesVolumeSlider.Value = Clamp(_selectedScene?.SceneButtonsHeadphonesVolume ?? 1.0, 0, 1.5);
+            SceneButtonsVirtualMicVolumeSlider.Value = Clamp(_selectedScene?.SceneButtonsVirtualMicVolume ?? 1.0, 0, 1.5);
+        }
+        finally
+        {
+            _loadingSceneUi = false;
+        }
+
+        UpdateSceneVolumeLabels();
+    }
+
     private string CreateSceneDetailsText(VoiSeScene scene)
     {
         var normalCount = scene.SoundButtons.Count(b => !b.IsLooped);
@@ -2610,6 +2708,10 @@ public sealed partial class MainWindow : Window
             $"Scene buttons: {normalCount}",
             $"Looped sound: {(hasLoop ? "set" : "none")}",
             $"Autostart loop: {(scene.AutoStartLoopedSounds ? "on" : "off")}",
+            $"Looped → Virtual Mic: {scene.LoopedSoundVirtualMicVolume:P0}",
+            $"Looped → Headphones: {scene.LoopedSoundHeadphonesVolume:P0}",
+            $"Scene buttons → Virtual Mic: {scene.SceneButtonsVirtualMicVolume:P0}",
+            $"Scene buttons → Headphones: {scene.SceneButtonsHeadphonesVolume:P0}",
             $"Virtual Mic Master: {scene.VirtualMicMasterVolume:P0}",
             $"SoundBoard → Virtual Mic: {scene.SoundBoardVirtualMicVolume:P0}",
             $"SoundBoard → Headphones: {scene.SoundBoardHeadphonesVolume:P0}",
@@ -2676,6 +2778,10 @@ public sealed partial class MainWindow : Window
                 .Select(CloneSceneSoundButton)
                 .ToList();
             var previousAutostartLoops = _selectedScene.AutoStartLoopedSounds;
+            var previousLoopVirtualVolume = _selectedScene.LoopedSoundVirtualMicVolume;
+            var previousLoopHeadphonesVolume = _selectedScene.LoopedSoundHeadphonesVolume;
+            var previousButtonsVirtualVolume = _selectedScene.SceneButtonsVirtualMicVolume;
+            var previousButtonsHeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume;
 
             var updated = CaptureCurrentScene(_selectedScene.Name);
             updated.Id = _selectedScene.Id;
@@ -2684,6 +2790,10 @@ public sealed partial class MainWindow : Window
             updated.FilePath = _selectedScene.FilePath;
             updated.SoundButtons = previousButtons.Count == 0 ? updated.SoundButtons : previousButtons;
             updated.AutoStartLoopedSounds = previousAutostartLoops;
+            updated.LoopedSoundVirtualMicVolume = previousLoopVirtualVolume;
+            updated.LoopedSoundHeadphonesVolume = previousLoopHeadphonesVolume;
+            updated.SceneButtonsVirtualMicVolume = previousButtonsVirtualVolume;
+            updated.SceneButtonsHeadphonesVolume = previousButtonsHeadphonesVolume;
             _sceneStore.OverwriteScene(updated);
             _selectedScene = updated;
             LoadScenesIntoUi();
@@ -2812,6 +2922,10 @@ public sealed partial class MainWindow : Window
             BackgroundSoundId = sound?.Id,
             BackgroundSoundName = sound?.DisplayName,
             SoundButtons = sceneSoundButtons,
+            LoopedSoundVirtualMicVolume = SoundVirtualVolumeSlider?.Value ?? 1.0,
+            LoopedSoundHeadphonesVolume = SoundMonitorVolumeSlider?.Value ?? 1.0,
+            SceneButtonsVirtualMicVolume = SoundVirtualVolumeSlider?.Value ?? 1.0,
+            SceneButtonsHeadphonesVolume = SoundMonitorVolumeSlider?.Value ?? 1.0,
             VirtualMicMasterVolume = VirtualOutputVolumeSlider?.Value ?? 1.0,
             SoundBoardVirtualMicVolume = SoundVirtualVolumeSlider?.Value ?? 1.0,
             SoundBoardHeadphonesVolume = SoundMonitorVolumeSlider?.Value ?? 1.0,
@@ -2888,8 +3002,7 @@ public sealed partial class MainWindow : Window
                     .FirstOrDefault(s => s is not null);
                 if (loopedSound is not null)
                 {
-                    SelectSound(loopedSound);
-                    PlaySelectedSound(loop: true);
+                    PlaySoundBoardSound(loopedSound, true, scene.LoopedSoundVirtualMicVolume, scene.LoopedSoundHeadphonesVolume, "Scene looped sound");
                     AppendLog("Looped sound autostart requested. Scene looped sound started in loop mode.");
                 }
             }
@@ -3320,8 +3433,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        SelectSound(context.Sound);
-        PlaySelectedSound();
+        PlaySoundBoardSound(context.Sound, false, context.Scene.SceneButtonsVirtualMicVolume, context.Scene.SceneButtonsHeadphonesVolume, "Scene sound");
     }
 
     private async Task RenameSceneSoundButtonAsync(SceneSoundButton sceneButton)
@@ -3651,8 +3763,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        SelectSound(sound);
-        PlaySelectedSound(loop);
+        PlaySoundBoardSound(sound, loop, _selectedScene?.LoopedSoundVirtualMicVolume ?? 1.0, _selectedScene?.LoopedSoundHeadphonesVolume ?? 1.0, "Scene looped sound");
     }
 
     private void OnSceneVoicePresetClearClick(object sender, RoutedEventArgs e)
@@ -4299,6 +4410,7 @@ public sealed partial class MainWindow : Window
     {
         UpdateDelayLabel();
         UpdateSoundVolumeLabels();
+        UpdateSceneVolumeLabels();
         UpdateOutputVolumeLabels();
         UpdateVoiceSettingLabels();
         UpdateVoiceMonitorButton();
@@ -4319,6 +4431,29 @@ public sealed partial class MainWindow : Window
         if (SoundVirtualVolumeLabel is null || SoundMonitorVolumeLabel is null) return;
         SoundVirtualVolumeLabel.Text = $"SoundBoard → Virtual Mic: {(int)Math.Round(SoundVirtualVolumeSlider.Value * 100)}%";
         SoundMonitorVolumeLabel.Text = $"SoundBoard → Headphones: {(int)Math.Round(SoundMonitorVolumeSlider.Value * 100)}%";
+    }
+
+    private void UpdateSceneVolumeLabels()
+    {
+        if (SceneLoopHeadphonesVolumeValueBox is not null && SceneLoopHeadphonesVolumeSlider is not null)
+        {
+            SceneLoopHeadphonesVolumeValueBox.Text = $"{(int)Math.Round(SceneLoopHeadphonesVolumeSlider.Value * 100)}%";
+        }
+
+        if (SceneLoopVirtualMicVolumeValueBox is not null && SceneLoopVirtualMicVolumeSlider is not null)
+        {
+            SceneLoopVirtualMicVolumeValueBox.Text = $"{(int)Math.Round(SceneLoopVirtualMicVolumeSlider.Value * 100)}%";
+        }
+
+        if (SceneButtonsHeadphonesVolumeValueBox is not null && SceneButtonsHeadphonesVolumeSlider is not null)
+        {
+            SceneButtonsHeadphonesVolumeValueBox.Text = $"{(int)Math.Round(SceneButtonsHeadphonesVolumeSlider.Value * 100)}%";
+        }
+
+        if (SceneButtonsVirtualMicVolumeValueBox is not null && SceneButtonsVirtualMicVolumeSlider is not null)
+        {
+            SceneButtonsVirtualMicVolumeValueBox.Text = $"{(int)Math.Round(SceneButtonsVirtualMicVolumeSlider.Value * 100)}%";
+        }
     }
 
     private void UpdateOutputVolumeLabels()

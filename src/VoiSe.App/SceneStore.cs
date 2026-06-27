@@ -111,7 +111,7 @@ public sealed class SceneStore
 
     private static void PrepareSceneForSave(VoiSeScene scene)
     {
-        scene.SchemaVersion = Math.Max(3, scene.SchemaVersion);
+        scene.SchemaVersion = Math.Max(4, scene.SchemaVersion);
         scene.Id = string.IsNullOrWhiteSpace(scene.Id) ? Guid.NewGuid().ToString("N") : scene.Id;
         scene.Icon = string.IsNullOrWhiteSpace(scene.Icon) ? "🎬" : scene.Icon;
         scene.VoiceSliders ??= new Dictionary<string, double>();

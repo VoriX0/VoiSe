@@ -504,7 +504,26 @@
                                         </Grid.ColumnDefinitions>
 
                                         <StackPanel Grid.Column="0" Spacing="8">
-                                            <TextBlock Text="Looped sound" FontWeight="SemiBold" />
+                                            <Grid ColumnSpacing="8" VerticalAlignment="Center">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Looped Sound" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="HP" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
+                                                    <Slider x:Name="SceneLoopHeadphonesVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="84" ValueChanged="OnSceneVolumeChanged" />
+                                                    <TextBlock x:Name="SceneLoopHeadphonesVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="Mic" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
+                                                    <Slider x:Name="SceneLoopVirtualMicVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="84" ValueChanged="OnSceneVolumeChanged" />
+                                                    <TextBlock x:Name="SceneLoopVirtualMicVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Grid>
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
@@ -549,7 +568,24 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="Scene sound buttons" FontSize="16" FontWeight="SemiBold" />
+                                        <Grid Grid.Row="0" ColumnSpacing="10" VerticalAlignment="Center">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Scene sound buttons" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="HP" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
+                                                <Slider x:Name="SceneButtonsHeadphonesVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="110" ValueChanged="OnSceneVolumeChanged" />
+                                                <TextBlock x:Name="SceneButtonsHeadphonesVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="Mic" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
+                                                <Slider x:Name="SceneButtonsVirtualMicVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="110" ValueChanged="OnSceneVolumeChanged" />
+                                                <TextBlock x:Name="SceneButtonsVirtualMicVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Grid>
                                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
                                             <VariableSizedWrapGrid x:Name="SceneSoundsPanel"
                                                                    Orientation="Horizontal"
