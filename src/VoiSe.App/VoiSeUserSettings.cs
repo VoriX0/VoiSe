@@ -51,4 +51,13 @@ public sealed class VoiSeUserSettings
     public double VoiceBitCrusher { get; set; } = 0.0;
     public double VoiceChorus { get; set; } = 0.0; // legacy / ignored from Gate 6.5+
     public double VoiceAlien { get; set; } = 0.0;
+
+
+    // Gate 6.15 global transport hotkeys. SoundBoard sound hotkeys live in soundboard.json;
+    // voice preset hotkeys live in individual preset JSON files.
+    public string? SoundBoardPlayHotkey { get; set; }
+    public string? SoundBoardPauseHotkey { get; set; }
+    public string? SoundBoardStopHotkey { get; set; }
+    public string? SoundBoardNextHotkey { get; set; }
+    public string? SoundBoardPreviousHotkey { get; set; }
 }

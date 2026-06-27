@@ -51,10 +51,19 @@ public sealed partial class MainWindow : Window
     private string? _currentSoundDisplayName;
     private DateTime _lastSoundRowClickUtc = DateTime.MinValue;
     private LowLevelMouseProc? _lowLevelMouseProc;
+    private LowLevelKeyboardProc? _lowLevelKeyboardProc;
     private IntPtr _mouseHookHandle;
+    private IntPtr _keyboardHookHandle;
     private IntPtr _windowHandle;
+    private VoicePreset? _pushToTalkPreviousVoicePreset;
+    private HotkeyGesture? _activePushToTalkGesture;
     private const int WhMouseLl = 14;
+    private const int WhKeyboardLl = 13;
     private const int WmMouseWheel = 0x020A;
+    private const int WmKeyDown = 0x0100;
+    private const int WmKeyUp = 0x0101;
+    private const int WmSysKeyDown = 0x0104;
+    private const int WmSysKeyUp = 0x0105;
     private const double SoundWheelZoneExpandUpRatio = 0.25;
     private const double SoundWheelZoneExpandRightRatio = 2.00;
     private const double SoundWheelZoneExpandBottomRatio = 1.60;
@@ -73,6 +82,7 @@ public sealed partial class MainWindow : Window
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         SoundInputOverlay.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundInputOverlayPointerWheelChanged), true);
         InstallSoundBoardWheelHook();
+        InstallGlobalKeyboardHook();
         Closed += OnClosed;
         Activated += OnActivated;
 
@@ -95,7 +105,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.14 UI started.");
+        AppendLog("Gate 6.15 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -117,27 +127,28 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.14 restore started.");
+            StartupLog.Write("Gate 6.15 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.14 scalar settings applied.");
+            StartupLog.Write("Gate 6.15 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.14 restore completed.");
+            StartupLog.Write("Gate 6.15 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.14 restore error: " + ex);
+            StartupLog.Write("Gate 6.15 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
         {
             _loadingSettings = false;
             UpdateAllLabels();
+            UpdateTransportHotkeySummary();
         }
     }
 
@@ -198,6 +209,54 @@ public sealed partial class MainWindow : Window
         {
             AppendLog($"Mouse wheel hook error: {ex.Message}");
         }
+    }
+
+    private void InstallGlobalKeyboardHook()
+    {
+        try
+        {
+            _lowLevelKeyboardProc = LowLevelKeyboardHookProc;
+            _keyboardHookHandle = SetWindowsHookEx(WhKeyboardLl, _lowLevelKeyboardProc, GetModuleHandle(null), 0);
+            if (_keyboardHookHandle == IntPtr.Zero)
+            {
+                AppendLog("Global hotkey hook was not installed. Hotkeys will work only through UI buttons.");
+            }
+            else
+            {
+                AppendLog("Global hotkey hook installed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Global hotkey hook error: {ex.Message}");
+        }
+    }
+
+    private IntPtr LowLevelKeyboardHookProc(int nCode, IntPtr wParam, IntPtr lParam)
+    {
+        if (nCode >= 0)
+        {
+            var message = wParam.ToInt32();
+            if (message == WmKeyDown || message == WmSysKeyDown || message == WmKeyUp || message == WmSysKeyUp)
+            {
+                try
+                {
+                    var data = Marshal.PtrToStructure<KeyboardLowLevelHookStruct>(lParam);
+                    var isKeyDown = message == WmKeyDown || message == WmSysKeyDown;
+                    var isKeyUp = message == WmKeyUp || message == WmSysKeyUp;
+                    if (TryHandleGlobalHotkey(data.VkCode, isKeyDown, isKeyUp))
+                    {
+                        return new IntPtr(1);
+                    }
+                }
+                catch
+                {
+                    // Never let the hotkey hook break normal keyboard input.
+                }
+            }
+        }
+
+        return CallNextHookEx(_keyboardHookHandle, nCode, wParam, lParam);
     }
 
     private IntPtr LowLevelMouseHookProc(int nCode, IntPtr wParam, IntPtr lParam)
@@ -463,6 +522,412 @@ public sealed partial class MainWindow : Window
         return true;
     }
 
+    private bool TryHandleGlobalHotkey(int vkCode, bool isKeyDown, bool isKeyUp)
+    {
+        if (IsModifierKey(vkCode))
+        {
+            return false;
+        }
+
+        if (isKeyUp)
+        {
+            return TryHandlePushToTalkRelease(vkCode);
+        }
+
+        if (!isKeyDown)
+        {
+            return false;
+        }
+
+        var current = HotkeyGesture.FromKeyboardState(vkCode, IsModifierDown);
+        if (current is null)
+        {
+            return false;
+        }
+
+        if (TryHandleSoundHotkey(current)) return true;
+        if (TryHandleVoicePresetHotkey(current)) return true;
+        if (TryHandleTransportHotkey(current)) return true;
+
+        return false;
+    }
+
+    private bool TryHandleSoundHotkey(HotkeyGesture current)
+    {
+        foreach (var sound in _library.Sounds)
+        {
+            if (HotkeyGesture.TryParse(sound.Hotkey, out var configured) && configured.Equals(current))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    SelectSound(sound);
+                    PlaySelectedSound();
+                    AppendLog($"Sound hotkey: {sound.DisplayName} [{configured}]");
+                });
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryHandleVoicePresetHotkey(HotkeyGesture current)
+    {
+        foreach (var preset in _voicePresets)
+        {
+            if (HotkeyGesture.TryParse(preset.PresetHotkey, out var presetHotkey) && presetHotkey.Equals(current))
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ApplyVoicePreset(preset);
+                    AppendLog($"Voice preset hotkey: {preset.Name} [{presetHotkey}]");
+                });
+                return true;
+            }
+
+            if (HotkeyGesture.TryParse(preset.PushToTalkHotkey, out var pushHotkey) && pushHotkey.Equals(current))
+            {
+                if (_activePushToTalkGesture is not null)
+                {
+                    return true;
+                }
+
+                _activePushToTalkGesture = pushHotkey;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    _pushToTalkPreviousVoicePreset = CaptureCurrentVoicePreset("Before push to talk");
+                    ApplyVoicePreset(preset);
+                    AppendLog($"Push-to-talk voice preset on: {preset.Name} [{pushHotkey}]");
+                });
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryHandlePushToTalkRelease(int vkCode)
+    {
+        if (_activePushToTalkGesture is null || _activePushToTalkGesture.KeyCode != vkCode)
+        {
+            return false;
+        }
+
+        var gesture = _activePushToTalkGesture;
+        _activePushToTalkGesture = null;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_pushToTalkPreviousVoicePreset is not null)
+            {
+                ApplyVoicePreset(_pushToTalkPreviousVoicePreset);
+                _pushToTalkPreviousVoicePreset = null;
+                AppendLog($"Push-to-talk voice preset off: [{gesture}]");
+            }
+        });
+        return true;
+    }
+
+    private bool TryHandleTransportHotkey(HotkeyGesture current)
+    {
+        if (HotkeyGesture.TryParse(_settings.SoundBoardPlayHotkey, out var play) && play.Equals(current))
+        {
+            DispatcherQueue.TryEnqueue(TransportPlay);
+            return true;
+        }
+
+        if (HotkeyGesture.TryParse(_settings.SoundBoardPauseHotkey, out var pause) && pause.Equals(current))
+        {
+            DispatcherQueue.TryEnqueue(TransportPause);
+            return true;
+        }
+
+        if (HotkeyGesture.TryParse(_settings.SoundBoardStopHotkey, out var stop) && stop.Equals(current))
+        {
+            DispatcherQueue.TryEnqueue(TransportStop);
+            return true;
+        }
+
+        if (HotkeyGesture.TryParse(_settings.SoundBoardNextHotkey, out var next) && next.Equals(current))
+        {
+            DispatcherQueue.TryEnqueue(() => SelectRelativeSound(1, play: true));
+            return true;
+        }
+
+        if (HotkeyGesture.TryParse(_settings.SoundBoardPreviousHotkey, out var previous) && previous.Equals(current))
+        {
+            DispatcherQueue.TryEnqueue(() => SelectRelativeSound(-1, play: true));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void TransportPlay()
+    {
+        var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
+        if (status.IsActive && status.IsPaused)
+        {
+            _engine?.ToggleSoundPause();
+            UpdateTimeline();
+            AppendLog("Transport hotkey: play/resume.");
+            return;
+        }
+
+        if (!status.IsActive)
+        {
+            PlaySelectedSound();
+            AppendLog("Transport hotkey: play.");
+        }
+    }
+
+    private void TransportPause()
+    {
+        var status = _engine?.GetSoundStatus() ?? SoundboardStatus.Empty;
+        if (status.IsActive && !status.IsPaused)
+        {
+            _engine?.ToggleSoundPause();
+            UpdateTimeline();
+            AppendLog("Transport hotkey: pause.");
+        }
+    }
+
+    private void TransportStop()
+    {
+        _engine?.StopSound();
+        _currentSoundDisplayName = null;
+        UpdateTimeline();
+        AppendLog("Transport hotkey: stop.");
+    }
+
+    private static bool IsModifierKey(int vkCode) => vkCode is 0x10 or 0x11 or 0x12 or 0xA0 or 0xA1 or 0xA2 or 0xA3 or 0xA4 or 0xA5;
+
+    private static bool IsModifierDown(int vkCode) => (GetAsyncKeyState(vkCode) & unchecked((short)0x8000)) != 0;
+
+    private async void OnConfigureTransportHotkeysClick(object sender, RoutedEventArgs e)
+    {
+        var playBox = new TextBox { Header = "Play", PlaceholderText = "Example: Ctrl+Alt+P", Text = _settings.SoundBoardPlayHotkey ?? string.Empty, MinWidth = 380 };
+        var pauseBox = new TextBox { Header = "Pause", PlaceholderText = "Example: Ctrl+Alt+Space", Text = _settings.SoundBoardPauseHotkey ?? string.Empty, MinWidth = 380 };
+        var stopBox = new TextBox { Header = "Stop", PlaceholderText = "Example: Ctrl+Alt+S", Text = _settings.SoundBoardStopHotkey ?? string.Empty, MinWidth = 380 };
+        var nextBox = new TextBox { Header = "Next", PlaceholderText = "Example: Ctrl+Alt+Right", Text = _settings.SoundBoardNextHotkey ?? string.Empty, MinWidth = 380 };
+        var previousBox = new TextBox { Header = "Previous", PlaceholderText = "Example: Ctrl+Alt+Left", Text = _settings.SoundBoardPreviousHotkey ?? string.Empty, MinWidth = 380 };
+
+        var panel = new StackPanel { Spacing = 10 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Use Ctrl / Alt / Shift combinations when possible. These hotkeys are global while VoiSe is running.",
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.78
+        });
+        panel.Children.Add(playBox);
+        panel.Children.Add(pauseBox);
+        panel.Children.Add(stopBox);
+        panel.Children.Add(nextBox);
+        panel.Children.Add(previousBox);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Transport hotkeys",
+            Content = panel,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = ((FrameworkElement)Content).XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        _settings.SoundBoardPlayHotkey = NormalizeOptionalHotkey(playBox.Text);
+        _settings.SoundBoardPauseHotkey = NormalizeOptionalHotkey(pauseBox.Text);
+        _settings.SoundBoardStopHotkey = NormalizeOptionalHotkey(stopBox.Text);
+        _settings.SoundBoardNextHotkey = NormalizeOptionalHotkey(nextBox.Text);
+        _settings.SoundBoardPreviousHotkey = NormalizeOptionalHotkey(previousBox.Text);
+        _settingsStore.Save(_settings);
+        UpdateTransportHotkeySummary();
+        AppendLog("Transport hotkeys updated.");
+    }
+
+    private static string? NormalizeOptionalHotkey(string? text)
+    {
+        return HotkeyGesture.TryParse(text, out var gesture) ? gesture.ToString() : null;
+    }
+
+    private void UpdateTransportHotkeySummary()
+    {
+        if (TransportHotkeysSummaryTextBlock is null)
+        {
+            return;
+        }
+
+        var parts = new[]
+        {
+            $"Play: {(_settings.SoundBoardPlayHotkey ?? "—")}",
+            $"Pause: {(_settings.SoundBoardPauseHotkey ?? "—")}",
+            $"Stop: {(_settings.SoundBoardStopHotkey ?? "—")}",
+            $"Next: {(_settings.SoundBoardNextHotkey ?? "—")}",
+            $"Prev: {(_settings.SoundBoardPreviousHotkey ?? "—")}"
+        };
+        TransportHotkeysSummaryTextBlock.Text = "Transport hotkeys: " + string.Join("    ", parts);
+    }
+
+    private readonly record struct HotkeyGesture(bool Ctrl, bool Alt, bool Shift, int KeyCode)
+    {
+        public static HotkeyGesture? FromKeyboardState(int vkCode, Func<int, bool> isDown)
+        {
+            if (!TryGetKeyName(vkCode, out _))
+            {
+                return null;
+            }
+
+            return new HotkeyGesture(
+                isDown(0x11) || isDown(0xA2) || isDown(0xA3),
+                isDown(0x12) || isDown(0xA4) || isDown(0xA5),
+                isDown(0x10) || isDown(0xA0) || isDown(0xA1),
+                vkCode);
+        }
+
+        public static bool TryParse(string? text, out HotkeyGesture gesture)
+        {
+            gesture = default;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            var ctrl = false;
+            var alt = false;
+            var shift = false;
+            int? keyCode = null;
+
+            foreach (var rawPart in text.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var part = rawPart.Trim();
+                if (part.Equals("Ctrl", StringComparison.OrdinalIgnoreCase) || part.Equals("Control", StringComparison.OrdinalIgnoreCase))
+                {
+                    ctrl = true;
+                    continue;
+                }
+
+                if (part.Equals("Alt", StringComparison.OrdinalIgnoreCase))
+                {
+                    alt = true;
+                    continue;
+                }
+
+                if (part.Equals("Shift", StringComparison.OrdinalIgnoreCase))
+                {
+                    shift = true;
+                    continue;
+                }
+
+                if (TryParseKeyCode(part, out var parsedKeyCode))
+                {
+                    keyCode = parsedKeyCode;
+                }
+            }
+
+            if (keyCode is null)
+            {
+                return false;
+            }
+
+            gesture = new HotkeyGesture(ctrl, alt, shift, keyCode.Value);
+            return true;
+        }
+
+        public override string ToString()
+        {
+            var parts = new List<string>();
+            if (Ctrl) parts.Add("Ctrl");
+            if (Alt) parts.Add("Alt");
+            if (Shift) parts.Add("Shift");
+            parts.Add(TryGetKeyName(KeyCode, out var keyName) ? keyName : KeyCode.ToString());
+            return string.Join("+", parts);
+        }
+
+        private static bool TryParseKeyCode(string token, out int keyCode)
+        {
+            keyCode = 0;
+            var upper = token.Trim().ToUpperInvariant();
+            if (upper.Length == 1)
+            {
+                var ch = upper[0];
+                if (ch is >= 'A' and <= 'Z' || ch is >= '0' and <= '9')
+                {
+                    keyCode = ch;
+                    return true;
+                }
+            }
+
+            if (upper.StartsWith("F") && int.TryParse(upper[1..], out var fn) && fn is >= 1 and <= 24)
+            {
+                keyCode = 0x70 + fn - 1;
+                return true;
+            }
+
+            keyCode = upper switch
+            {
+                "SPACE" => 0x20,
+                "ENTER" or "RETURN" => 0x0D,
+                "ESC" or "ESCAPE" => 0x1B,
+                "TAB" => 0x09,
+                "LEFT" => 0x25,
+                "UP" => 0x26,
+                "RIGHT" => 0x27,
+                "DOWN" => 0x28,
+                "HOME" => 0x24,
+                "END" => 0x23,
+                "PAGEUP" or "PGUP" => 0x21,
+                "PAGEDOWN" or "PGDN" => 0x22,
+                "INSERT" or "INS" => 0x2D,
+                "DELETE" or "DEL" => 0x2E,
+                "BACKSPACE" => 0x08,
+                _ => 0
+            };
+            return keyCode != 0;
+        }
+
+        private static bool TryGetKeyName(int keyCode, out string keyName)
+        {
+            keyName = string.Empty;
+            if (keyCode is >= 0x41 and <= 0x5A || keyCode is >= 0x30 and <= 0x39)
+            {
+                keyName = ((char)keyCode).ToString();
+                return true;
+            }
+
+            if (keyCode is >= 0x70 and <= 0x87)
+            {
+                keyName = "F" + (keyCode - 0x70 + 1);
+                return true;
+            }
+
+            keyName = keyCode switch
+            {
+                0x20 => "Space",
+                0x0D => "Enter",
+                0x1B => "Esc",
+                0x09 => "Tab",
+                0x25 => "Left",
+                0x26 => "Up",
+                0x27 => "Right",
+                0x28 => "Down",
+                0x24 => "Home",
+                0x23 => "End",
+                0x21 => "PageUp",
+                0x22 => "PageDown",
+                0x2D => "Insert",
+                0x2E => "Delete",
+                0x08 => "Backspace",
+                _ => string.Empty
+            };
+            return keyName.Length > 0;
+        }
+    }
+
     private void OnSoundInputOverlayPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         var point = e.GetCurrentPoint(SoundInputOverlay);
@@ -544,6 +1009,7 @@ public sealed partial class MainWindow : Window
     }
 
     private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+    private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativePoint
@@ -562,8 +1028,21 @@ public sealed partial class MainWindow : Window
         public IntPtr ExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardLowLevelHookStruct
+    {
+        public int VkCode;
+        public int ScanCode;
+        public int Flags;
+        public int Time;
+        public IntPtr ExtraInfo;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnhookWindowsHookEx(IntPtr hhk);
@@ -580,6 +1059,9 @@ public sealed partial class MainWindow : Window
     [DllImport("user32.dll")]
     private static extern bool ScreenToClient(IntPtr hWnd, ref NativePoint lpPoint);
 
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
     private void UpdateBottomPanelVisibility()
     {
         // Gate 5.6: no shared bottom panel. Kept as a no-op for older call sites.
@@ -595,6 +1077,11 @@ public sealed partial class MainWindow : Window
         {
             UnhookWindowsHookEx(_mouseHookHandle);
             _mouseHookHandle = IntPtr.Zero;
+        }
+        if (_keyboardHookHandle != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_keyboardHookHandle);
+            _keyboardHookHandle = IntPtr.Zero;
         }
         _catalog.Dispose();
     }
@@ -1164,10 +1651,11 @@ public sealed partial class MainWindow : Window
         if (_selectedSound is null) return;
         var hotkey = await ShowTextDialogAsync("Assign hotkey", "Example: Ctrl+Alt+1", _selectedSound.Hotkey ?? string.Empty);
         if (hotkey is null) return;
-        _libraryStore.SetHotkey(_library, _selectedSound, hotkey);
+        var normalized = NormalizeOptionalHotkey(hotkey);
+        _libraryStore.SetHotkey(_library, _selectedSound, normalized);
         RefreshSoundList();
         SaveCurrentSettings();
-        AppendLog($"Hotkey assigned: {_selectedSound.DisplayName} -> {hotkey}");
+        AppendLog($"Hotkey assigned: {_selectedSound.DisplayName} -> {normalized ?? "none"}");
     }
 
     private async void OnSoundContextRenameClick(object sender, RoutedEventArgs e)
@@ -1894,8 +2382,8 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        preset.PushToTalkHotkey = string.IsNullOrWhiteSpace(pushToTalkBox.Text) ? null : pushToTalkBox.Text.Trim();
-        preset.PresetHotkey = string.IsNullOrWhiteSpace(presetBox.Text) ? null : presetBox.Text.Trim();
+        preset.PushToTalkHotkey = NormalizeOptionalHotkey(pushToTalkBox.Text);
+        preset.PresetHotkey = NormalizeOptionalHotkey(presetBox.Text);
         _voicePresetStore.OverwritePreset(preset);
         LoadVoicePresetsIntoUi();
         AppendLog($"Voice preset hotkeys saved: {preset.Name}");
@@ -2181,6 +2669,7 @@ public sealed partial class MainWindow : Window
         UpdateBottomStats();
         UpdateTimeline();
         UpdateBottomPanelVisibility();
+        UpdateTransportHotkeySummary();
     }
 
     private void UpdateDelayLabel()

@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 6.14 - Settings Layout and Formant">
+    Title="VoiSe Gate 6.15 - Global Hotkeys">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -21,8 +21,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 6.14" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Logs button and SoundBoard playing title" Opacity="0.75" />
+                    <TextBlock Text="VoiSe Gate 6.15" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock Text="Global hotkeys for SoundBoard, Voice Changer and transport" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -471,6 +471,15 @@
                             <StackPanel x:Name="SettingsLogArea" Orientation="Horizontal" Spacing="10" Background="Transparent">
                                 <Button Content="Open logs" Padding="14,6" MinHeight="32" Click="OnOpenLogFullscreenClick" />
                                 <TextBlock Text="Application log opens in a separate window." VerticalAlignment="Center" Opacity="0.7" />
+                            </StackPanel>
+
+                            <TextBlock Text="Hotkeys" FontSize="18" FontWeight="SemiBold" />
+                            <StackPanel Spacing="8" Background="Transparent">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Button Content="Configure transport hotkeys" Padding="14,6" MinHeight="32" Click="OnConfigureTransportHotkeysClick" />
+                                    <TextBlock Text="Play, Pause, Stop, Next and Previous for SoundBoard transport." VerticalAlignment="Center" Opacity="0.7" />
+                                </StackPanel>
+                                <TextBlock x:Name="TransportHotkeysSummaryTextBlock" Text="Transport hotkeys: not configured" Opacity="0.72" TextWrapping="Wrap" />
                             </StackPanel>
 
                             <TextBlock Text="SoundBoard" FontSize="18" FontWeight="SemiBold" />
