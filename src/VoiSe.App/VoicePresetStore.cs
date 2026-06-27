@@ -86,6 +86,30 @@ public sealed class VoicePresetStore
         return path;
     }
 
+    public string ImportPreset(string sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException("Preset JSON file not found.", sourcePath);
+        }
+
+        var json = File.ReadAllText(sourcePath);
+        var preset = JsonSerializer.Deserialize<VoicePreset>(json, JsonOptions)
+            ?? throw new InvalidDataException("Selected JSON is not a VoiSe voice preset.");
+
+        if (string.IsNullOrWhiteSpace(preset.Name))
+        {
+            preset.Name = Path.GetFileNameWithoutExtension(sourcePath);
+        }
+
+        preset.SchemaVersion = Math.Max(1, preset.SchemaVersion);
+        preset.Icon = string.IsNullOrWhiteSpace(preset.Icon) ? "🎙️" : preset.Icon;
+        preset.Sliders ??= new Dictionary<string, double>();
+        preset.FilePath = GetAvailablePresetPath(preset.Name);
+        File.WriteAllText(preset.FilePath, JsonSerializer.Serialize(preset, JsonOptions));
+        return preset.FilePath;
+    }
+
     public string OverwritePreset(VoicePreset preset)
     {
         Directory.CreateDirectory(PresetsDirectory);

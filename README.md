@@ -1,15 +1,14 @@
-# VoiSe Gate 6.19 — Hotkey Button Capture UX
+# VoiSe Gate 6.20 — Preset Import Tools
 
-Gate 6.19 improves hotkey assignment UX.
+Gate 6.20 is the final Gate 6 polish pass before Scenes.
 
-## Changes
+Added to Voice Changer presets:
 
-- Hotkeys are assigned with a button: click it, then press a key or combination.
-- Esc cancels key capture.
-- A small **×** button clears the current hotkey.
-- Only plain English letters **A-Z** and **< > { }** are local-only.
-- Ctrl / Alt / Shift combinations remain global.
-- Transport hotkeys still use one **Play / Pause** action.
+- a combined tools tile after New preset;
+- top half: Import preset JSON;
+- bottom half: open presets folder;
+- imported presets are copied into `%LOCALAPPDATA%\VoiSe\presets\`;
+- existing Gate 6.19 hotkey capture UX is preserved.
 
 Run:
 

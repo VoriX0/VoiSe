@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Media;
 using NAudio.CoreAudioApi;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -106,7 +107,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.19 UI started.");
+        AppendLog("Gate 6.20 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -128,21 +129,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.19 restore started.");
+            StartupLog.Write("Gate 6.20 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.19 scalar settings applied.");
+            StartupLog.Write("Gate 6.20 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.19 restore completed.");
+            StartupLog.Write("Gate 6.20 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.19 restore error: " + ex);
+            StartupLog.Write("Gate 6.20 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -2467,6 +2468,7 @@ public sealed partial class MainWindow : Window
         }
 
         VoicePresetsPanel.Children.Add(CreateNewVoicePresetTile());
+        VoicePresetsPanel.Children.Add(CreateVoicePresetToolsTile());
     }
 
     private FrameworkElement CreateVoicePresetTile(VoicePreset preset)
@@ -2731,6 +2733,109 @@ public sealed partial class MainWindow : Window
         stack.Children.Add(button);
         stack.Children.Add(label);
         return stack;
+    }
+
+    private FrameworkElement CreateVoicePresetToolsTile()
+    {
+        var stack = new StackPanel
+        {
+            Width = 104,
+            Spacing = 6,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+
+        var grid = new Grid
+        {
+            Width = 84,
+            Height = 84,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Top,
+            RowSpacing = 4
+        };
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var importButton = new Button
+        {
+            Content = "Import",
+            MinWidth = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        importButton.Click += OnImportVoicePresetClick;
+        Grid.SetRow(importButton, 0);
+
+        var folderButton = new Button
+        {
+            Content = "Folder",
+            MinWidth = 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        folderButton.Click += OnOpenVoicePresetsFolderClick;
+        Grid.SetRow(folderButton, 1);
+
+        grid.Children.Add(importButton);
+        grid.Children.Add(folderButton);
+
+        var label = new TextBlock
+        {
+            Text = "Preset tools",
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        stack.Children.Add(grid);
+        stack.Children.Add(label);
+        return stack;
+    }
+
+    private async void OnImportVoicePresetClick(object sender, RoutedEventArgs e)
+    {
+        var filePath = await PickVoicePresetFileAsync();
+        if (filePath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var importedPath = _voicePresetStore.ImportPreset(filePath);
+            LoadVoicePresetsIntoUi();
+            AppendLog($"Voice preset imported: {System.IO.Path.GetFileName(importedPath)}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Voice preset import error: {ex.Message}");
+        }
+    }
+
+    private async Task<string?> PickVoicePresetFileAsync()
+    {
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".json");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSingleFileAsync();
+        return file?.Path;
+    }
+
+    private void OnOpenVoicePresetsFolderClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(_voicePresetStore.PresetsDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _voicePresetStore.PresetsDirectory,
+                UseShellExecute = true
+            });
+            AppendLog($"Voice presets folder opened: {_voicePresetStore.PresetsDirectory}");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Open voice presets folder error: {ex.Message}");
+        }
     }
 
     private void OnVoicePresetClick(object sender, RoutedEventArgs e)
