@@ -105,7 +105,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.15 UI started.");
+        AppendLog("Gate 6.16 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -127,21 +127,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.15 restore started.");
+            StartupLog.Write("Gate 6.16 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.15 scalar settings applied.");
+            StartupLog.Write("Gate 6.16 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.15 restore completed.");
+            StartupLog.Write("Gate 6.16 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.15 restore error: " + ex);
+            StartupLog.Write("Gate 6.16 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -539,12 +539,13 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
-        var current = HotkeyGesture.FromKeyboardState(vkCode, IsModifierDown);
-        if (current is null)
+        var currentMaybe = HotkeyGesture.FromKeyboardState(vkCode, IsModifierDown);
+        if (!currentMaybe.HasValue)
         {
             return false;
         }
 
+        var current = currentMaybe.Value;
         if (TryHandleSoundHotkey(current)) return true;
         if (TryHandleVoicePresetHotkey(current)) return true;
         if (TryHandleTransportHotkey(current)) return true;
@@ -608,12 +609,12 @@ public sealed partial class MainWindow : Window
 
     private bool TryHandlePushToTalkRelease(int vkCode)
     {
-        if (_activePushToTalkGesture is null || _activePushToTalkGesture.KeyCode != vkCode)
+        if (!_activePushToTalkGesture.HasValue || _activePushToTalkGesture.Value.KeyCode != vkCode)
         {
             return false;
         }
 
-        var gesture = _activePushToTalkGesture;
+        var gesture = _activePushToTalkGesture.Value;
         _activePushToTalkGesture = null;
         DispatcherQueue.TryEnqueue(() =>
         {

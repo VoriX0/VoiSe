@@ -1,1 +1,1 @@
-Gate 6.15 - Global Hotkeys
+Gate 6.16 - Global Hotkeys Build Fix

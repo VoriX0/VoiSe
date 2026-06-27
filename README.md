@@ -1,10 +1,10 @@
-# VoiSe Gate 6.15 — Global Hotkeys
+# VoiSe Gate 6.16 — Global Hotkeys Build Fix
 
-Gate 6.15 adds global hotkeys on top of the working Gate 6.14 Settings layout, SoundBoard scroll behavior, Voice Changer Pitch/Formant controls, preset JSON export, and SoundBoard playing-title UI.
+Gate 6.16 adds global hotkeys on top of the working Gate 6.14 Settings layout, SoundBoard scroll behavior, Voice Changer Pitch/Formant controls, preset JSON export, and SoundBoard playing-title UI.
 
 ## What is included
 
-- Window title/version updated to **VoiSe Gate 6.15**.
+- Window title/version updated to **VoiSe Gate 6.16**.
 - Global keyboard hook for hotkeys while VoiSe is running.
 - SoundBoard per-sound hotkeys now execute:
   - right click a sound → **Assign Hotkey**;
