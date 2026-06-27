@@ -106,7 +106,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 6.17 UI started.");
+        AppendLog("Gate 6.19 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -128,21 +128,21 @@ public sealed partial class MainWindow : Window
         try
         {
             AppendLog("Restoring saved settings...");
-            StartupLog.Write("Gate 6.17 restore started.");
+            StartupLog.Write("Gate 6.19 restore started.");
 
             ApplyStoredScalarSettingsToControls();
             AppendLog("Saved scalar settings applied.");
-            StartupLog.Write("Gate 6.17 scalar settings applied.");
+            StartupLog.Write("Gate 6.19 scalar settings applied.");
 
             RefreshDevices(saveAfterRefresh: false);
             LoadSoundBoardLibraryIntoUi();
             LoadVoicePresetsIntoUi();
             AppendLog("Settings restored.");
-            StartupLog.Write("Gate 6.17 restore completed.");
+            StartupLog.Write("Gate 6.19 restore completed.");
         }
         catch (Exception ex)
         {
-            StartupLog.Write("Gate 6.17 restore error: " + ex);
+            StartupLog.Write("Gate 6.19 restore error: " + ex);
             AppendLog($"Settings restore error: {ex.GetType().Name}: {ex.Message}");
         }
         finally
@@ -553,9 +553,10 @@ public sealed partial class MainWindow : Window
 
         var current = currentMaybe.Value;
 
-        // Plain single-key hotkeys are local-only so letters like H are not stolen from Telegram, Discord, browsers, etc.
-        // Ctrl/Alt/Shift combinations remain global and are consumed by VoiSe when they match a configured hotkey.
-        if (!current.HasModifier)
+        // Only plain English letter keys and < > { } are local-only.
+        // This keeps common typing keys like H from being stolen in Telegram/Discord/browser text fields.
+        // Other single keys and Ctrl/Alt/Shift combinations remain global when explicitly assigned.
+        if (IsLocalOnlyPlainHotkey(current))
         {
             if (GetForegroundWindow() != _windowHandle || IsTextInputFocused())
             {
@@ -755,20 +756,34 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private static bool IsLocalOnlyPlainHotkey(HotkeyGesture gesture)
+    {
+        return !gesture.HasModifier && IsLocalOnlyPlainKeyCode(gesture.KeyCode);
+    }
+
+    private static bool IsLocalOnlyPlainKeyCode(int keyCode)
+    {
+        return keyCode is >= 0x41 and <= 0x5A // A-Z
+            or 0xBC // < / comma key
+            or 0xBE // > / period key
+            or 0xDB // { / [ key
+            or 0xDD; // } / ] key
+    }
+
     private async void OnConfigureTransportHotkeysClick(object sender, RoutedEventArgs e)
     {
         var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(new TextBlock
         {
-            Text = "Click a field and press the key or key combination. Single letters/numbers work only when VoiSe is focused; use Ctrl/Alt/Shift combinations for global hotkeys that should work while typing in other apps.",
+            Text = "Click a hotkey button, then press a key or Ctrl/Alt/Shift combination. Esc cancels capture. Plain A-Z and < > { } are local-only; Ctrl/Alt/Shift combinations remain global.",
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.78
         });
 
-        panel.Children.Add(CreateHotkeyCaptureRow("Play / Pause", _settings.SoundBoardPlayHotkey, out var playPauseBox));
-        panel.Children.Add(CreateHotkeyCaptureRow("Stop", _settings.SoundBoardStopHotkey, out var stopBox));
-        panel.Children.Add(CreateHotkeyCaptureRow("Next", _settings.SoundBoardNextHotkey, out var nextBox));
-        panel.Children.Add(CreateHotkeyCaptureRow("Previous", _settings.SoundBoardPreviousHotkey, out var previousBox));
+        panel.Children.Add(CreateHotkeyCaptureRow("Play / Pause", _settings.SoundBoardPlayHotkey, out var playPauseButton));
+        panel.Children.Add(CreateHotkeyCaptureRow("Stop", _settings.SoundBoardStopHotkey, out var stopButton));
+        panel.Children.Add(CreateHotkeyCaptureRow("Next", _settings.SoundBoardNextHotkey, out var nextButton));
+        panel.Children.Add(CreateHotkeyCaptureRow("Previous", _settings.SoundBoardPreviousHotkey, out var previousButton));
 
         var dialog = new ContentDialog
         {
@@ -794,56 +809,144 @@ public sealed partial class MainWindow : Window
             _capturingHotkey = false;
         }
 
-        _settings.SoundBoardPlayHotkey = NormalizeOptionalHotkey(playPauseBox.Text);
+        _settings.SoundBoardPlayHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(playPauseButton));
         _settings.SoundBoardPauseHotkey = null;
-        _settings.SoundBoardStopHotkey = NormalizeOptionalHotkey(stopBox.Text);
-        _settings.SoundBoardNextHotkey = NormalizeOptionalHotkey(nextBox.Text);
-        _settings.SoundBoardPreviousHotkey = NormalizeOptionalHotkey(previousBox.Text);
+        _settings.SoundBoardStopHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(stopButton));
+        _settings.SoundBoardNextHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(nextButton));
+        _settings.SoundBoardPreviousHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(previousButton));
         _settingsStore.Save(_settings);
         UpdateTransportHotkeySummary();
         AppendLog("Transport hotkeys updated.");
     }
 
-    private FrameworkElement CreateHotkeyCaptureRow(string header, string? initialValue, out TextBox textBox)
+    private FrameworkElement CreateHotkeyCaptureRow(string header, string? initialValue, out Button captureButton)
     {
-        var grid = new Grid { ColumnSpacing = 8 };
+        var grid = new Grid
+        {
+            ColumnSpacing = 8,
+            RowSpacing = 4
+        };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        textBox = CreateHotkeyCaptureTextBox(header, initialValue);
-        Grid.SetColumn(textBox, 0);
-        grid.Children.Add(textBox);
+        var label = new TextBlock
+        {
+            Text = header,
+            FontSize = 12,
+            Opacity = 0.72
+        };
+        Grid.SetColumn(label, 0);
+        Grid.SetRow(label, 0);
+        grid.Children.Add(label);
+
+        captureButton = CreateHotkeyCaptureButton(initialValue);
+        var capturedButton = captureButton;
+        Grid.SetColumn(capturedButton, 0);
+        Grid.SetRow(capturedButton, 1);
+        grid.Children.Add(capturedButton);
 
         var clearButton = new Button
         {
-            Content = "Clear",
-            MinWidth = 72,
+            Content = "✕",
+            MinWidth = 42,
             VerticalAlignment = VerticalAlignment.Bottom
         };
-        clearButton.Click += (_, _) => textBox.Text = string.Empty;
+        clearButton.Click += (_, _) =>
+        {
+            capturedButton.Tag = null;
+            SetHotkeyButtonText(capturedButton, null);
+        };
         Grid.SetColumn(clearButton, 1);
+        Grid.SetRow(clearButton, 1);
         grid.Children.Add(clearButton);
 
         return grid;
     }
 
-    private TextBox CreateHotkeyCaptureTextBox(string header, string? initialValue)
+    private Button CreateHotkeyCaptureButton(string? initialValue)
     {
-        var box = new TextBox
+        var button = new Button
         {
-            Header = header,
-            PlaceholderText = "Click here, then press a key or combination",
-            Text = initialValue ?? string.Empty,
-            IsReadOnly = true,
-            MinWidth = 380
+            Content = string.Empty,
+            MinWidth = 380,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(12, 8, 12, 8)
         };
-        box.KeyDown += OnHotkeyCaptureBoxKeyDown;
-        return box;
+
+        SetHotkeyButtonText(button, initialValue);
+        button.Click += OnHotkeyCaptureButtonClick;
+        button.KeyDown += OnHotkeyCaptureButtonKeyDown;
+        button.LostFocus += OnHotkeyCaptureButtonLostFocus;
+        return button;
     }
 
-    private void OnHotkeyCaptureBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    private sealed class HotkeyCaptureState
     {
+        public HotkeyCaptureState(string? previousText)
+        {
+            PreviousText = previousText;
+        }
+
+        public string? PreviousText { get; }
+    }
+
+    private static void SetHotkeyButtonText(Button button, string? hotkey)
+    {
+        button.Content = string.IsNullOrWhiteSpace(hotkey) ? "—" : hotkey.Trim();
+    }
+
+    private static string? GetHotkeyButtonValue(Button button)
+    {
+        var text = button.Content?.ToString()?.Trim();
+        if (string.IsNullOrWhiteSpace(text) || text == "—" || text.StartsWith("Press", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return text;
+    }
+
+    private void OnHotkeyCaptureButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button)
+        {
+            return;
+        }
+
+        var previous = GetHotkeyButtonValue(button);
+        button.Tag = new HotkeyCaptureState(previous);
+        button.Content = "Press key…  Esc cancels";
+        button.Focus(FocusState.Programmatic);
+    }
+
+    private void OnHotkeyCaptureButtonLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: HotkeyCaptureState state } button)
+        {
+            SetHotkeyButtonText(button, state.PreviousText);
+            button.Tag = null;
+        }
+    }
+
+    private void OnHotkeyCaptureButtonKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not HotkeyCaptureState state)
+        {
+            return;
+        }
+
         var vkCode = (int)e.Key;
+        if (vkCode == 0x1B) // Esc cancels capture.
+        {
+            SetHotkeyButtonText(button, state.PreviousText);
+            button.Tag = null;
+            e.Handled = true;
+            return;
+        }
+
         if (IsModifierKey(vkCode))
         {
             e.Handled = true;
@@ -851,9 +954,10 @@ public sealed partial class MainWindow : Window
         }
 
         var gestureMaybe = HotkeyGesture.FromKeyboardState(vkCode, IsModifierDown);
-        if (gestureMaybe.HasValue && sender is TextBox box)
+        if (gestureMaybe.HasValue)
         {
-            box.Text = gestureMaybe.Value.ToString();
+            SetHotkeyButtonText(button, gestureMaybe.Value.ToString());
+            button.Tag = null;
             e.Handled = true;
         }
     }
@@ -868,15 +972,13 @@ public sealed partial class MainWindow : Window
             Opacity = 0.78
         });
 
-        var box = CreateHotkeyCaptureTextBox("Hotkey", initialValue);
-        panel.Children.Add(box);
+        panel.Children.Add(CreateHotkeyCaptureRow("Hotkey", initialValue, out var hotkeyButton));
 
         var dialog = new ContentDialog
         {
             Title = title,
             Content = panel,
             PrimaryButtonText = "Save",
-            SecondaryButtonText = "Clear",
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = ((FrameworkElement)Content).XamlRoot
@@ -886,12 +988,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var result = await dialog.ShowAsync();
-            return result switch
-            {
-                ContentDialogResult.Primary => box.Text,
-                ContentDialogResult.Secondary => string.Empty,
-                _ => null
-            };
+            return result == ContentDialogResult.Primary ? GetHotkeyButtonValue(hotkeyButton) : null;
         }
         finally
         {
@@ -1010,6 +1107,19 @@ public sealed partial class MainWindow : Window
                     keyCode = ch;
                     return true;
                 }
+
+                keyCode = ch switch
+                {
+                    '<' => 0xBC,
+                    '>' => 0xBE,
+                    '{' => 0xDB,
+                    '}' => 0xDD,
+                    _ => 0
+                };
+                if (keyCode != 0)
+                {
+                    return true;
+                }
             }
 
             if (upper.StartsWith("F") && int.TryParse(upper[1..], out var fn) && fn is >= 1 and <= 24)
@@ -1046,6 +1156,19 @@ public sealed partial class MainWindow : Window
             if (keyCode is >= 0x41 and <= 0x5A || keyCode is >= 0x30 and <= 0x39)
             {
                 keyName = ((char)keyCode).ToString();
+                return true;
+            }
+
+            keyName = keyCode switch
+            {
+                0xBC => "<",
+                0xBE => ">",
+                0xDB => "{",
+                0xDD => "}",
+                _ => string.Empty
+            };
+            if (keyName.Length > 0)
+            {
                 return true;
             }
 
@@ -1801,7 +1924,7 @@ public sealed partial class MainWindow : Window
         if (_selectedSound is null) return;
         var hotkey = await CaptureHotkeyDialogAsync(
             "Assign sound hotkey",
-            "Click the field and press a key or combination. Single letters/numbers are local-only; use Ctrl/Alt/Shift combinations for global hotkeys that work while other apps are focused.",
+            "Click the hotkey button, then press a key or Ctrl/Alt/Shift combination. Esc cancels capture. Plain A-Z and < > { } are local-only; Ctrl/Alt/Shift combinations remain global.",
             _selectedSound.Hotkey);
         if (hotkey is null) return;
         var normalized = NormalizeOptionalHotkey(hotkey);
@@ -2502,12 +2625,12 @@ public sealed partial class MainWindow : Window
         };
         panel.Children.Add(new TextBlock
         {
-            Text = "Click a field and press the key or key combination. Single letters/numbers are local-only; use Ctrl/Alt/Shift combinations for global preset switching.",
+            Text = "Click a hotkey button, then press a key or Ctrl/Alt/Shift combination. Esc cancels capture. Plain A-Z and < > { } are local-only; Ctrl/Alt/Shift combinations remain global.",
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.78
         });
-        panel.Children.Add(CreateHotkeyCaptureRow("Push to talk", preset.PushToTalkHotkey, out var pushToTalkBox));
-        panel.Children.Add(CreateHotkeyCaptureRow("Preset select", preset.PresetHotkey, out var presetBox));
+        panel.Children.Add(CreateHotkeyCaptureRow("Push to talk", preset.PushToTalkHotkey, out var pushToTalkButton));
+        panel.Children.Add(CreateHotkeyCaptureRow("Preset select", preset.PresetHotkey, out var presetButton));
 
         var dialog = new ContentDialog
         {
@@ -2533,8 +2656,8 @@ public sealed partial class MainWindow : Window
             _capturingHotkey = false;
         }
 
-        preset.PushToTalkHotkey = NormalizeOptionalHotkey(pushToTalkBox.Text);
-        preset.PresetHotkey = NormalizeOptionalHotkey(presetBox.Text);
+        preset.PushToTalkHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(pushToTalkButton));
+        preset.PresetHotkey = NormalizeOptionalHotkey(GetHotkeyButtonValue(presetButton));
         _voicePresetStore.OverwritePreset(preset);
         LoadVoicePresetsIntoUi();
         AppendLog($"Voice preset hotkeys saved: {preset.Name}");
