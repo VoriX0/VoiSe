@@ -484,7 +484,7 @@
                                 </Grid>
                             </StackPanel>
 
-                            <Border Grid.Column="1" Padding="18" BorderThickness="1" BorderBrush="#33FFFFFF" CornerRadius="8">
+                            <Border Grid.Column="1" Padding="18">
                                 <Grid RowSpacing="16">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -533,7 +533,7 @@
                                                       x:Name="LoopedSceneSoundsPanel"
                                                       Height="58" />
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
-                                                    <Button x:Name="SceneLoopPlayLoopButton" Content="↻" Width="42" Height="58" Click="OnSceneLoopPlayLoopClick" ToolTipService.ToolTip="Start loop" />
+                                                    <Button x:Name="SceneLoopPlayLoopButton" Content="∞" Width="42" Height="58" Click="OnSceneLoopPlayLoopClick" ToolTipService.ToolTip="Start loop" />
                                                     <Button x:Name="SceneLoopPlayOnceButton" Content="▶" Width="42" Height="58" Click="OnSceneLoopPlayOnceClick" ToolTipService.ToolTip="Play once" />
                                                     <Button x:Name="SceneLoopRemoveButton" Content="✕" Width="42" Height="58" Click="OnSceneLoopRemoveClick" ToolTipService.ToolTip="Remove sound" />
                                                     <Button x:Name="SceneLoopChooseButton" Content="⮏" Width="42" Height="58" Click="OnSceneLoopChooseClick" ToolTipService.ToolTip="Choose another sound" />
@@ -571,20 +571,8 @@
                                         <Grid Grid.Row="0" ColumnSpacing="10" VerticalAlignment="Center">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Scene sound buttons" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                <TextBlock Text="HP" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
-                                                <Slider x:Name="SceneButtonsHeadphonesVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="110" ValueChanged="OnSceneVolumeChanged" />
-                                                <TextBlock x:Name="SceneButtonsHeadphonesVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                <TextBlock Text="Mic" Opacity="0.72" FontSize="12" VerticalAlignment="Center" />
-                                                <Slider x:Name="SceneButtonsVirtualMicVolumeSlider" Minimum="0" Maximum="1.5" Value="1" StepFrequency="0.01" Width="110" ValueChanged="OnSceneVolumeChanged" />
-                                                <TextBlock x:Name="SceneButtonsVirtualMicVolumeValueBox" Text="100%" Opacity="0.72" FontSize="12" Width="36" VerticalAlignment="Center" />
-                                            </StackPanel>
                                         </Grid>
                                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
                                             <VariableSizedWrapGrid x:Name="SceneSoundsPanel"

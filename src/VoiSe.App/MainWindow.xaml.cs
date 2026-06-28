@@ -619,7 +619,7 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
-                    PlaySoundBoardSound(sound, false, activeScene.SceneButtonsVirtualMicVolume, activeScene.SceneButtonsHeadphonesVolume, "Scene sound");
+                    PlaySoundBoardSound(sound, false, sceneButton.VirtualMicVolume, sceneButton.HeadphonesVolume, "Scene sound");
                 }
 
                 AppendLog($"Scene hotkey: {activeScene.Name} / {displayName} [{configured}]");
@@ -2352,8 +2352,6 @@ public sealed partial class MainWindow : Window
 
         _selectedScene.LoopedSoundHeadphonesVolume = SceneLoopHeadphonesVolumeSlider?.Value ?? 1.0;
         _selectedScene.LoopedSoundVirtualMicVolume = SceneLoopVirtualMicVolumeSlider?.Value ?? 1.0;
-        _selectedScene.SceneButtonsHeadphonesVolume = SceneButtonsHeadphonesVolumeSlider?.Value ?? 1.0;
-        _selectedScene.SceneButtonsVirtualMicVolume = SceneButtonsVirtualMicVolumeSlider?.Value ?? 1.0;
         SaveSelectedSceneVolumeChange();
     }
 
@@ -2627,8 +2625,6 @@ public sealed partial class MainWindow : Window
         if (SceneAutostartLoopsCheckBox is not null) SceneAutostartLoopsCheckBox.IsEnabled = enabled;
         if (SceneLoopHeadphonesVolumeSlider is not null) SceneLoopHeadphonesVolumeSlider.IsEnabled = enabled;
         if (SceneLoopVirtualMicVolumeSlider is not null) SceneLoopVirtualMicVolumeSlider.IsEnabled = enabled;
-        if (SceneButtonsHeadphonesVolumeSlider is not null) SceneButtonsHeadphonesVolumeSlider.IsEnabled = enabled;
-        if (SceneButtonsVirtualMicVolumeSlider is not null) SceneButtonsVirtualMicVolumeSlider.IsEnabled = enabled;
         RefreshSceneLoopActionButtons();
     }
 
@@ -2676,9 +2672,7 @@ public sealed partial class MainWindow : Window
     private void RefreshSceneVolumeControls()
     {
         if (SceneLoopHeadphonesVolumeSlider is null ||
-            SceneLoopVirtualMicVolumeSlider is null ||
-            SceneButtonsHeadphonesVolumeSlider is null ||
-            SceneButtonsVirtualMicVolumeSlider is null)
+            SceneLoopVirtualMicVolumeSlider is null)
         {
             return;
         }
@@ -2688,8 +2682,6 @@ public sealed partial class MainWindow : Window
         {
             SceneLoopHeadphonesVolumeSlider.Value = Clamp(_selectedScene?.LoopedSoundHeadphonesVolume ?? 1.0, 0, 1.5);
             SceneLoopVirtualMicVolumeSlider.Value = Clamp(_selectedScene?.LoopedSoundVirtualMicVolume ?? 1.0, 0, 1.5);
-            SceneButtonsHeadphonesVolumeSlider.Value = Clamp(_selectedScene?.SceneButtonsHeadphonesVolume ?? 1.0, 0, 1.5);
-            SceneButtonsVirtualMicVolumeSlider.Value = Clamp(_selectedScene?.SceneButtonsVirtualMicVolume ?? 1.0, 0, 1.5);
         }
         finally
         {
@@ -2710,8 +2702,6 @@ public sealed partial class MainWindow : Window
             $"Autostart loop: {(scene.AutoStartLoopedSounds ? "on" : "off")}",
             $"Looped → Virtual Mic: {scene.LoopedSoundVirtualMicVolume:P0}",
             $"Looped → Headphones: {scene.LoopedSoundHeadphonesVolume:P0}",
-            $"Scene buttons → Virtual Mic: {scene.SceneButtonsVirtualMicVolume:P0}",
-            $"Scene buttons → Headphones: {scene.SceneButtonsHeadphonesVolume:P0}",
             $"Virtual Mic Master: {scene.VirtualMicMasterVolume:P0}",
             $"SoundBoard → Virtual Mic: {scene.SoundBoardVirtualMicVolume:P0}",
             $"SoundBoard → Headphones: {scene.SoundBoardHeadphonesVolume:P0}",
@@ -2780,9 +2770,6 @@ public sealed partial class MainWindow : Window
             var previousAutostartLoops = _selectedScene.AutoStartLoopedSounds;
             var previousLoopVirtualVolume = _selectedScene.LoopedSoundVirtualMicVolume;
             var previousLoopHeadphonesVolume = _selectedScene.LoopedSoundHeadphonesVolume;
-            var previousButtonsVirtualVolume = _selectedScene.SceneButtonsVirtualMicVolume;
-            var previousButtonsHeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume;
-
             var updated = CaptureCurrentScene(_selectedScene.Name);
             updated.Id = _selectedScene.Id;
             updated.Icon = _selectedScene.Icon;
@@ -2792,8 +2779,6 @@ public sealed partial class MainWindow : Window
             updated.AutoStartLoopedSounds = previousAutostartLoops;
             updated.LoopedSoundVirtualMicVolume = previousLoopVirtualVolume;
             updated.LoopedSoundHeadphonesVolume = previousLoopHeadphonesVolume;
-            updated.SceneButtonsVirtualMicVolume = previousButtonsVirtualVolume;
-            updated.SceneButtonsHeadphonesVolume = previousButtonsHeadphonesVolume;
             _sceneStore.OverwriteScene(updated);
             _selectedScene = updated;
             LoadScenesIntoUi();
@@ -2906,6 +2891,8 @@ public sealed partial class MainWindow : Window
             {
                 SoundId = sound.Id,
                 LocalName = sound.DisplayName,
+                VirtualMicVolume = SoundVirtualVolumeSlider?.Value ?? 1.0,
+                HeadphonesVolume = SoundMonitorVolumeSlider?.Value ?? 1.0,
                 IsLooped = false,
                 SortOrder = 0
             });
@@ -2955,6 +2942,7 @@ public sealed partial class MainWindow : Window
             }
 
             var firstButtonSound = scene.SoundButtons
+                .Where(b => !b.IsLooped)
                 .OrderBy(b => b.SortOrder)
                 .Select(b => PickSound(b.SoundId))
                 .FirstOrDefault(s => s is not null);
@@ -2995,6 +2983,7 @@ public sealed partial class MainWindow : Window
 
             if (scene.AutoStartLoopedSounds)
             {
+                _engine?.StopSound();
                 var loopedSound = scene.SoundButtons
                     .Where(b => b.IsLooped)
                     .OrderBy(b => b.SortOrder)
@@ -3084,6 +3073,8 @@ public sealed partial class MainWindow : Window
             SoundId = source.SoundId,
             LocalName = source.LocalName,
             SceneHotkey = source.SceneHotkey,
+            VirtualMicVolume = source.VirtualMicVolume,
+            HeadphonesVolume = source.HeadphonesVolume,
             IsLooped = source.IsLooped,
             SortOrder = source.SortOrder
         };
@@ -3376,6 +3367,8 @@ public sealed partial class MainWindow : Window
         {
             SoundId = sound.Id,
             LocalName = sound.DisplayName,
+            VirtualMicVolume = _selectedScene.SceneButtonsVirtualMicVolume,
+            HeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume,
             IsLooped = false,
             SortOrder = nextOrder
         });
@@ -3383,41 +3376,163 @@ public sealed partial class MainWindow : Window
         SaveSelectedSceneEditorChange($"Scene sound added: {sound.DisplayName}");
     }
 
-    private MenuFlyout CreateSceneSoundButtonFlyout(SceneSoundButtonContext context)
+    private Flyout CreateSceneSoundButtonFlyout(SceneSoundButtonContext context)
     {
-        var flyout = new MenuFlyout();
+        var flyout = new Flyout
+        {
+            Placement = FlyoutPlacementMode.Bottom
+        };
 
-        flyout.Items.Add(new MenuFlyoutItem
+        var panel = new StackPanel
+        {
+            Width = 340,
+            Spacing = 8,
+            Padding = new Thickness(10)
+        };
+
+        panel.Children.Add(new TextBlock
         {
             Text = $"SoundBoard: {context.SourceName}",
-            IsEnabled = false
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
         });
-        flyout.Items.Add(new MenuFlyoutSeparator());
 
-        var rename = new MenuFlyoutItem { Text = "Rename" };
-        rename.Click += async (_, _) => await RenameSceneSoundButtonAsync(context.Button);
-        flyout.Items.Add(rename);
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
 
-        var chooseAnother = new MenuFlyoutItem { Text = "Choose another sound" };
-        chooseAnother.Click += async (_, _) => await ChooseAnotherSceneSoundAsync(context.Button);
-        flyout.Items.Add(chooseAnother);
+        var rename = new Button { Content = "Rename", MinWidth = 72 };
+        rename.Click += async (_, _) =>
+        {
+            flyout.Hide();
+            await RenameSceneSoundButtonAsync(context.Button);
+        };
+        actions.Children.Add(rename);
 
-        var delete = new MenuFlyoutItem { Text = "Delete" };
-        delete.Click += (_, _) => DeleteSceneSoundButton(context.Button);
-        flyout.Items.Add(delete);
+        var chooseAnother = new Button { Content = "Choose", MinWidth = 72 };
+        chooseAnother.Click += async (_, _) =>
+        {
+            flyout.Hide();
+            await ChooseAnotherSceneSoundAsync(context.Button);
+        };
+        actions.Children.Add(chooseAnother);
+
+        var delete = new Button { Content = "Delete", MinWidth = 72 };
+        delete.Click += (_, _) =>
+        {
+            flyout.Hide();
+            DeleteSceneSoundButton(context.Button);
+        };
+        actions.Children.Add(delete);
 
         var hotkeyText = string.IsNullOrWhiteSpace(context.Button.SceneHotkey)
-            ? "Scene hotkey"
-            : $"Scene hotkey: {context.Button.SceneHotkey}";
-        var hotkey = new MenuFlyoutItem
+            ? "Hotkey"
+            : $"Hotkey: {context.Button.SceneHotkey}";
+        var hotkey = new Button
         {
-            Text = hotkeyText,
+            Content = hotkeyText,
+            MinWidth = 72,
             IsEnabled = context.Sound is not null
         };
-        hotkey.Click += async (_, _) => await EditSceneSoundHotkeyAsync(context.Button);
-        flyout.Items.Add(hotkey);
+        hotkey.Click += async (_, _) =>
+        {
+            flyout.Hide();
+            await EditSceneSoundHotkeyAsync(context.Button);
+        };
+        actions.Children.Add(hotkey);
+        panel.Children.Add(actions);
 
+        panel.Children.Add(new Border
+        {
+            Height = 1,
+            Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x26, 0xFF, 0xFF, 0xFF)),
+            Margin = new Thickness(0, 2, 0, 2)
+        });
+
+        panel.Children.Add(CreateSceneSoundButtonVolumeRow(context.Button, "Headphones", isHeadphones: true));
+        panel.Children.Add(CreateSceneSoundButtonVolumeRow(context.Button, "Virtual Mic", isHeadphones: false));
+
+        flyout.Content = panel;
         return flyout;
+    }
+
+    private FrameworkElement CreateSceneSoundButtonVolumeRow(SceneSoundButton button, string label, bool isHeadphones)
+    {
+        var grid = new Grid
+        {
+            ColumnSpacing = 8
+        };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(42) });
+
+        var title = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0.78
+        };
+        Grid.SetColumn(title, 0);
+        grid.Children.Add(title);
+
+        var currentValue = isHeadphones ? button.HeadphonesVolume : button.VirtualMicVolume;
+        var value = new TextBlock
+        {
+            Text = $"{(int)Math.Round(Clamp(currentValue, 0, 1.5) * 100)}%",
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0.78
+        };
+        Grid.SetColumn(value, 2);
+        grid.Children.Add(value);
+
+        var slider = new Slider
+        {
+            Minimum = 0,
+            Maximum = 1.5,
+            StepFrequency = 0.01,
+            Value = Clamp(currentValue, 0, 1.5),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        slider.ValueChanged += (_, args) =>
+        {
+            var clamped = Clamp(args.NewValue, 0, 1.5);
+            if (isHeadphones)
+            {
+                button.HeadphonesVolume = clamped;
+            }
+            else
+            {
+                button.VirtualMicVolume = clamped;
+            }
+
+            value.Text = $"{(int)Math.Round(clamped * 100)}%";
+            SaveSceneSoundButtonVolumeChange(button);
+        };
+        Grid.SetColumn(slider, 1);
+        grid.Children.Add(slider);
+
+        return grid;
+    }
+
+    private void SaveSceneSoundButtonVolumeChange(SceneSoundButton button)
+    {
+        if (_selectedScene is null || !_selectedScene.SoundButtons.Any(candidate => candidate.Id == button.Id))
+        {
+            return;
+        }
+
+        try
+        {
+            _selectedScene.UpdatedAtUtc = DateTime.UtcNow;
+            _sceneStore.OverwriteScene(_selectedScene);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Scene sound volume save error: {ex.Message}");
+        }
     }
 
     private void OnSceneSoundButtonClick(object sender, RoutedEventArgs e)
@@ -3433,7 +3548,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        PlaySoundBoardSound(context.Sound, false, context.Scene.SceneButtonsVirtualMicVolume, context.Scene.SceneButtonsHeadphonesVolume, "Scene sound");
+        PlaySoundBoardSound(context.Sound, false, context.Button.VirtualMicVolume, context.Button.HeadphonesVolume, "Scene sound");
     }
 
     private async Task RenameSceneSoundButtonAsync(SceneSoundButton sceneButton)
@@ -3733,6 +3848,8 @@ public sealed partial class MainWindow : Window
             {
                 SoundId = sound.Id,
                 LocalName = sound.DisplayName,
+                VirtualMicVolume = _selectedScene.SceneButtonsVirtualMicVolume,
+                HeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume,
                 IsLooped = true,
                 SortOrder = nextOrder
             });
@@ -4445,15 +4562,6 @@ public sealed partial class MainWindow : Window
             SceneLoopVirtualMicVolumeValueBox.Text = $"{(int)Math.Round(SceneLoopVirtualMicVolumeSlider.Value * 100)}%";
         }
 
-        if (SceneButtonsHeadphonesVolumeValueBox is not null && SceneButtonsHeadphonesVolumeSlider is not null)
-        {
-            SceneButtonsHeadphonesVolumeValueBox.Text = $"{(int)Math.Round(SceneButtonsHeadphonesVolumeSlider.Value * 100)}%";
-        }
-
-        if (SceneButtonsVirtualMicVolumeValueBox is not null && SceneButtonsVirtualMicVolumeSlider is not null)
-        {
-            SceneButtonsVirtualMicVolumeValueBox.Text = $"{(int)Math.Round(SceneButtonsVirtualMicVolumeSlider.Value * 100)}%";
-        }
     }
 
     private void UpdateOutputVolumeLabels()

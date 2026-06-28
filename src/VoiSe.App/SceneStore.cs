@@ -46,6 +46,7 @@ public sealed class SceneStore
                 scene.SoundButtons ??= new List<SceneSoundButton>();
                 MigrateLegacySceneSounds(scene);
                 EnforceSingleLoopedSound(scene);
+                NormalizeSceneSoundVolumes(scene);
                 scene.FilePath = file;
                 scenes.Add(scene);
             }
@@ -111,7 +112,7 @@ public sealed class SceneStore
 
     private static void PrepareSceneForSave(VoiSeScene scene)
     {
-        scene.SchemaVersion = Math.Max(4, scene.SchemaVersion);
+        scene.SchemaVersion = Math.Max(5, scene.SchemaVersion);
         scene.Id = string.IsNullOrWhiteSpace(scene.Id) ? Guid.NewGuid().ToString("N") : scene.Id;
         scene.Icon = string.IsNullOrWhiteSpace(scene.Icon) ? "🎬" : scene.Icon;
         scene.VoiceSliders ??= new Dictionary<string, double>();
@@ -119,6 +120,7 @@ public sealed class SceneStore
         scene.SoundButtons ??= new List<SceneSoundButton>();
         MigrateLegacySceneSounds(scene);
         EnforceSingleLoopedSound(scene);
+        NormalizeSceneSoundVolumes(scene);
         scene.CreatedAtUtc = scene.CreatedAtUtc == default ? DateTime.UtcNow : scene.CreatedAtUtc;
         scene.UpdatedAtUtc = DateTime.UtcNow;
     }
@@ -137,6 +139,8 @@ public sealed class SceneStore
             {
                 SoundId = scene.BackgroundSoundId!,
                 LocalName = scene.BackgroundSoundName,
+                VirtualMicVolume = scene.SceneButtonsVirtualMicVolume,
+                HeadphonesVolume = scene.SceneButtonsHeadphonesVolume,
                 IsLooped = true,
                 SortOrder = sortOrder++
             });
@@ -152,6 +156,8 @@ public sealed class SceneStore
             scene.SoundButtons.Add(new SceneSoundButton
             {
                 SoundId = soundId,
+                VirtualMicVolume = scene.SceneButtonsVirtualMicVolume,
+                HeadphonesVolume = scene.SceneButtonsHeadphonesVolume,
                 IsLooped = false,
                 SortOrder = sortOrder++
             });

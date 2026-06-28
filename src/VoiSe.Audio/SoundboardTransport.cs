@@ -70,6 +70,7 @@ public sealed class SoundboardTransport
             if (loop)
             {
                 _primary = sound;
+                _overlays.Clear();
                 return;
             }
 
