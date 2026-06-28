@@ -1,8 +1,8 @@
-# VoiSe Gate 7.8 — Scene play/pause buttons and scene action hotkeys
+# VoiSe Gate 7.9 — Scene play/pause buttons and scene action hotkeys
 
 WinUI 3 starter app for VoiSe with SoundBoard, Voice Changer presets, and Scene Editor.
 
-Gate 7.8 refines the Scene workflow:
+Gate 7.9 refines the Scene workflow:
 
 - looped sound keeps one timeline without a separate timeline play/pause button;
 - looped sound actions now include Start loop and Play/Stop;

@@ -148,7 +148,6 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -508,7 +507,6 @@
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
@@ -553,7 +551,7 @@
                                                       Height="88" />
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
                                                     <Button x:Name="SceneLoopPlayLoopButton" Content="∞" Width="42" Height="42" Click="OnSceneLoopPlayLoopClick" ToolTipService.ToolTip="Start loop" />
-                                                    <Button x:Name="SceneLoopPlayOnceButton" Content="▶■" Width="42" Height="42" FontSize="13" Click="OnSceneLoopPlayOnceClick" ToolTipService.ToolTip="Play / stop looped sound" />
+                                                    <Button x:Name="SceneLoopPlayOnceButton" Content="&#xE768;" FontFamily="Segoe MDL2 Assets" Width="42" Height="42" FontSize="16" Click="OnSceneLoopPlayOnceClick" ToolTipService.ToolTip="Play / pause looped sound" />
                                                     <Button x:Name="SceneLoopRemoveButton" Content="✕" Width="42" Height="42" Click="OnSceneLoopRemoveClick" ToolTipService.ToolTip="Remove sound" />
                                                     <Button x:Name="SceneLoopChooseButton" Content="⮏" Width="42" Height="42" Click="OnSceneLoopChooseClick" ToolTipService.ToolTip="Choose another sound" />
                                                 </StackPanel>
@@ -582,14 +580,7 @@
                                         </StackPanel>
                                     </Grid>
 
-                                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                        <TextBlock Text="Scene action hotkeys" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <Button x:Name="SceneStopOneShotsHotkeyButton" Content="Stop one-shots: —" MinWidth="150" Click="OnSceneStopOneShotsHotkeyClick" />
-                                        <Button x:Name="ScenePauseOneShotsHotkeyButton" Content="Pause one-shots: —" MinWidth="154" Click="OnScenePauseOneShotsHotkeyClick" />
-                                        <Button x:Name="SceneDisableHotkeyButton" Content="Disable scene: —" MinWidth="148" Click="OnSceneDisableHotkeyClick" />
-                                    </StackPanel>
-
-                                    <Grid Grid.Row="4" RowSpacing="8">
+                                    <Grid Grid.Row="3" RowSpacing="8">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="*" />
@@ -603,8 +594,8 @@
                                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
                                             <VariableSizedWrapGrid x:Name="SceneSoundsPanel"
                                                                    Orientation="Horizontal"
-                                                                   ItemWidth="218"
-                                                                   ItemHeight="118"
+                                                                   ItemWidth="262"
+                                                                   ItemHeight="122"
                                                                    MaximumRowsOrColumns="6" />
                                         </ScrollViewer>
                                     </Grid>
@@ -653,8 +644,8 @@
                             <TextBlock Text="Hotkeys" FontSize="18" FontWeight="SemiBold" />
                             <StackPanel Spacing="8" Background="Transparent">
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <Button Content="Configure transport hotkeys" Padding="14,6" MinHeight="32" Click="OnConfigureTransportHotkeysClick" />
-                                    <TextBlock Text="Play/Pause, Stop, Next and Previous for SoundBoard transport." VerticalAlignment="Center" Opacity="0.7" />
+                                    <Button Content="Hotkeys" Padding="14,6" MinHeight="32" Click="OnConfigureTransportHotkeysClick" />
+                                    <TextBlock Text="Transport hotkeys. While a scene is active, Play/Pause and Stop control only scene one-shot sounds." VerticalAlignment="Center" Opacity="0.7" />
                                 </StackPanel>
                                 <TextBlock x:Name="TransportHotkeysSummaryTextBlock" Text="Transport hotkeys: not configured" Opacity="0.72" TextWrapping="Wrap" />
                             </StackPanel>

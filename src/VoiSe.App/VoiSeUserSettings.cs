@@ -2,7 +2,7 @@ namespace VoiSe.App;
 
 public sealed class VoiSeUserSettings
 {
-    public int SchemaVersion { get; set; } = 3;
+    public int SchemaVersion { get; set; } = 4;
 
     public string? InputDeviceId { get; set; }
     public string? InputDeviceName { get; set; }
@@ -60,4 +60,5 @@ public sealed class VoiSeUserSettings
     public string? SoundBoardStopHotkey { get; set; }
     public string? SoundBoardNextHotkey { get; set; }
     public string? SoundBoardPreviousHotkey { get; set; }
+    public string? DisableSceneHotkey { get; set; }
 }
