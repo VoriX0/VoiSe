@@ -164,6 +164,30 @@ public sealed class SceneStore
         }
     }
 
+    private static void NormalizeSceneSoundVolumes(VoiSeScene scene)
+    {
+        scene.LoopedSoundHeadphonesVolume = NormalizeVolume(scene.LoopedSoundHeadphonesVolume);
+        scene.LoopedSoundVirtualMicVolume = NormalizeVolume(scene.LoopedSoundVirtualMicVolume);
+        scene.SceneButtonsHeadphonesVolume = NormalizeVolume(scene.SceneButtonsHeadphonesVolume);
+        scene.SceneButtonsVirtualMicVolume = NormalizeVolume(scene.SceneButtonsVirtualMicVolume);
+
+        foreach (var button in scene.SoundButtons)
+        {
+            button.HeadphonesVolume = NormalizeVolume(button.HeadphonesVolume);
+            button.VirtualMicVolume = NormalizeVolume(button.VirtualMicVolume);
+        }
+    }
+
+    private static double NormalizeVolume(double value)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return 1.0;
+        }
+
+        return Math.Max(0.0, Math.Min(1.5, value));
+    }
+
 
     private static void EnforceSingleLoopedSound(VoiSeScene scene)
     {
