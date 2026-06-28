@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 7.8 - Scene Playback">
+    Title="VoiSe Gate 7.10 - Scene Playback">
 
     <Grid x:Name="RootGrid" Padding="20" RowSpacing="14">
         <Grid.RowDefinitions>
@@ -22,7 +22,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
                     <TextBlock Text="VoiSe Gate 7.8" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Scenes: play/pause sound buttons, action hotkeys, independent timelines, and active-scene SoundBoard lock" Opacity="0.75" />
+                    <TextBlock Text="Scenes: active-only playback, independent picker state, fixed scroll routing, and synchronized loop names" Opacity="0.75" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -591,7 +591,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Scene sound buttons" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                                         </Grid>
-                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
+                                        <ScrollViewer x:Name="SceneSoundButtonsScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
                                             <VariableSizedWrapGrid x:Name="SceneSoundsPanel"
                                                                    Orientation="Horizontal"
                                                                    ItemWidth="262"
@@ -606,7 +606,7 @@
                 </TabViewItem>
 
                 <TabViewItem Header="Settings" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
+                    <ScrollViewer x:Name="SettingsScrollViewer" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" ZoomMode="Disabled">
                         <StackPanel Spacing="18" Padding="0,16,48,24">
                             <TextBlock Text="Audio devices" FontSize="18" FontWeight="SemiBold" />
 

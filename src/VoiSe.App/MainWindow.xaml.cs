@@ -338,7 +338,8 @@ public sealed partial class MainWindow : Window
         {
             0 => IsPointInSoundBoardWheelZone(xDip, yDip) && TryScrollSoundOverlay(delta),
             1 => IsPointInVoiceChangerWheelZone(yDip) && TryScrollVoiceChanger(delta),
-            3 => false,
+            2 => TryHandleScenesWheel(yDip, delta),
+            3 => TryHandleSettingsWheel(yDip, delta),
             _ => false
         };
     }
@@ -420,16 +421,41 @@ public sealed partial class MainWindow : Window
 
     private bool TryScrollVoiceChanger(int wheelDelta)
     {
-        if (VoiceChangerScrollViewer is null || wheelDelta == 0)
+        return TryScrollViewer(VoiceChangerScrollViewer, wheelDelta, 42.0);
+    }
+
+    private bool TryHandleScenesWheel(double yDip, int wheelDelta)
+    {
+        if (IsPointInExtendedVerticalWheelZone(SceneSoundButtonsScrollViewer, yDip))
+        {
+            return TryScrollViewer(SceneSoundButtonsScrollViewer, wheelDelta, 42.0);
+        }
+
+        return false;
+    }
+
+    private bool TryHandleSettingsWheel(double yDip, int wheelDelta)
+    {
+        if (IsPointInExtendedVerticalWheelZone(SettingsScrollViewer, yDip))
+        {
+            return TryScrollViewer(SettingsScrollViewer, wheelDelta, 42.0);
+        }
+
+        return false;
+    }
+
+    private static bool TryScrollViewer(ScrollViewer? scrollViewer, int wheelDelta, double pixelsPerNotch)
+    {
+        if (scrollViewer is null || wheelDelta == 0)
         {
             return false;
         }
 
         var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
-        var step = 42.0 * notches;
-        var target = VoiceChangerScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
-        target = Math.Max(0, Math.Min(VoiceChangerScrollViewer.ScrollableHeight, target));
-        VoiceChangerScrollViewer.ChangeView(null, target, null, disableAnimation: false);
+        var step = pixelsPerNotch * notches;
+        var target = scrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
+        target = Math.Max(0, Math.Min(scrollViewer.ScrollableHeight, target));
+        scrollViewer.ChangeView(null, target, null, disableAnimation: false);
         return true;
     }
 
@@ -529,18 +555,8 @@ public sealed partial class MainWindow : Window
 
     private bool TryScrollSoundOverlay(int wheelDelta)
     {
-        if (SoundOverlayScrollViewer is null || wheelDelta == 0)
-        {
-            return false;
-        }
-
         // Smaller step than the native 120px-style jumps: about one row per wheel notch.
-        var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
-        var step = 14.0 * notches;
-        var target = SoundOverlayScrollViewer.VerticalOffset - Math.Sign(wheelDelta) * step;
-        target = Math.Max(0, Math.Min(SoundOverlayScrollViewer.ScrollableHeight, target));
-        SoundOverlayScrollViewer.ChangeView(null, target, null, disableAnimation: false);
-        return true;
+        return TryScrollViewer(SoundOverlayScrollViewer, wheelDelta, 14.0);
     }
 
     private bool TryHandleGlobalHotkey(int vkCode, bool isKeyDown, bool isKeyUp)
@@ -624,7 +640,9 @@ public sealed partial class MainWindow : Window
                 }
                 else
                 {
-                    ToggleSceneSoundButtonPlayback(activeScene, sceneButton, sound);
+                    // Scene sound hotkeys intentionally restart the assigned one-shot from the beginning.
+                    // Mouse clicks keep the play/pause/resume behavior.
+                    PlaySceneSound(activeScene, sceneButton, sound, false, "Scene sound hotkey");
                 }
 
                 AppendLog($"Scene hotkey: {activeScene.Name} / {displayName} [{configured}]");
@@ -2087,6 +2105,7 @@ public sealed partial class MainWindow : Window
         if (name is null) return;
         _libraryStore.RenameSound(_library, _selectedSound, name);
         RefreshSoundList();
+        RebuildSceneSoundButtons();
         SaveCurrentSettings();
         AppendLog($"Track renamed: {name}");
     }
@@ -2337,7 +2356,9 @@ public sealed partial class MainWindow : Window
             : SceneButtonPlaybackKey(scene.Id, sceneButton.Id);
         var virtualVolume = loop ? scene.LoopedSoundVirtualMicVolume : sceneButton.VirtualMicVolume;
         var monitorVolume = loop ? scene.LoopedSoundHeadphonesVolume : sceneButton.HeadphonesVolume;
-        var displayName = string.IsNullOrWhiteSpace(sceneButton.LocalName) ? sound.DisplayName : sceneButton.LocalName!.Trim();
+        var displayName = loop || string.IsNullOrWhiteSpace(sceneButton.LocalName)
+            ? sound.DisplayName
+            : sceneButton.LocalName!.Trim();
         PlaySoundPath(sound.FilePath, sound, displayName, loop, virtualVolume, monitorVolume, sourceLabel, playbackKey, updateSoundBoardTransportUi: false);
         UpdateSceneTimelines();
     }
@@ -2860,8 +2881,20 @@ public sealed partial class MainWindow : Window
         try
         {
             var scene = CaptureCurrentScene(name.Trim());
+            scene.VoicePresetName = null;
+            scene.VoiceSliders.Clear();
+            scene.SoundCategoryId = null;
+            scene.SoundCategoryName = null;
+            scene.BackgroundSoundId = null;
+            scene.BackgroundSoundName = null;
             scene.SoundButtons.Clear();
             scene.AutoStartLoopedSounds = false;
+            scene.LoopedSoundVirtualMicVolume = 1.0;
+            scene.LoopedSoundHeadphonesVolume = 1.0;
+            scene.SceneButtonsVirtualMicVolume = 1.0;
+            scene.SceneButtonsHeadphonesVolume = 1.0;
+            scene.SoundBoardVirtualMicVolume = 1.0;
+            scene.SoundBoardHeadphonesVolume = 1.0;
             _sceneStore.SaveScene(scene);
             _selectedScene = scene;
             LoadScenesIntoUi();
@@ -3086,35 +3119,8 @@ public sealed partial class MainWindow : Window
                 _lastAppliedVoicePresetName = null;
             }
 
-            var firstButtonSound = scene.SoundButtons
-                .Where(b => !b.IsLooped)
-                .OrderBy(b => b.SortOrder)
-                .Select(b => PickSound(b.SoundId))
-                .FirstOrDefault(s => s is not null);
-
-            var category = PickCategory(firstButtonSound?.CategoryId ?? scene.SoundCategoryId)
-                ?? _library.Categories.FirstOrDefault(c => string.Equals(c.Name, scene.SoundCategoryName, StringComparison.CurrentCultureIgnoreCase));
-            if (category is not null)
-            {
-                CategoryComboBox.SelectedItem = category;
-                RefreshSoundList();
-            }
-
-            var sound = firstButtonSound
-                ?? PickSound(scene.BackgroundSoundId)
-                ?? _library.Sounds.FirstOrDefault(s => string.Equals(s.DisplayName, scene.BackgroundSoundName, StringComparison.CurrentCultureIgnoreCase));
-            if (sound is not null)
-            {
-                var soundCategory = PickCategory(sound.CategoryId);
-                if (soundCategory is not null && !ReferenceEquals(CategoryComboBox.SelectedItem, soundCategory))
-                {
-                    CategoryComboBox.SelectedItem = soundCategory;
-                    RefreshSoundList();
-                }
-
-                SelectSound(sound);
-            }
-
+            // Applying a scene must not disturb the user's current SoundBoard category or selected sound.
+            // Scene playback uses SoundId lookups directly and is intentionally independent from SoundBoard browsing state.
             UpdateAllLabels();
             ApplyLiveSettings($"scene applied: {scene.Name}");
             if (_engine is not null)
@@ -3192,6 +3198,35 @@ public sealed partial class MainWindow : Window
 
     private bool IsSceneActive => !string.IsNullOrWhiteSpace(_activeSceneId);
 
+    private bool IsSceneActiveForPlayback(VoiSeScene? scene)
+    {
+        return scene is not null
+            && !string.IsNullOrWhiteSpace(_activeSceneId)
+            && string.Equals(scene.Id, _activeSceneId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool RequireSceneActiveForPlayback(VoiSeScene? scene, string action)
+    {
+        if (IsSceneActiveForPlayback(scene))
+        {
+            return true;
+        }
+
+        AppendLog($"Scene must be active to {action}.");
+        return false;
+    }
+
+    private void UpdateScenePlaybackInteractivity()
+    {
+        RefreshSceneLoopActionButtons();
+        foreach (var binding in _sceneTimelineBindings.Values)
+        {
+            binding.Slider.IsEnabled = IsSelectedSceneActiveForPlayback();
+        }
+    }
+
+    private bool IsSelectedSceneActiveForPlayback() => IsSceneActiveForPlayback(_selectedScene);
+
     private void UpdateSceneActiveFlags()
     {
         foreach (var scene in _scenes)
@@ -3214,6 +3249,7 @@ public sealed partial class MainWindow : Window
         if (SoundVirtualVolumeSlider is not null) SoundVirtualVolumeSlider.IsEnabled = !locked;
         if (SoundMonitorVolumeSlider is not null) SoundMonitorVolumeSlider.IsEnabled = !locked;
         if (SoundBoardSceneLockOverlay is not null) SoundBoardSceneLockOverlay.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
+        UpdateScenePlaybackInteractivity();
     }
 
     private bool BlockSoundBoardPlaybackIfSceneActive()
@@ -3356,11 +3392,12 @@ public sealed partial class MainWindow : Window
     private void RefreshSceneLoopActionButtons()
     {
         var hasScene = _selectedScene is not null;
+        var playbackEnabled = IsSelectedSceneActiveForPlayback();
         var hasLoopedSound = GetSelectedSceneLoopedButton() is not null;
-        if (SceneLoopPlayLoopButton is not null) SceneLoopPlayLoopButton.IsEnabled = hasLoopedSound;
+        if (SceneLoopPlayLoopButton is not null) SceneLoopPlayLoopButton.IsEnabled = hasLoopedSound && playbackEnabled;
         if (SceneLoopPlayOnceButton is not null)
         {
-            SceneLoopPlayOnceButton.IsEnabled = hasLoopedSound;
+            SceneLoopPlayOnceButton.IsEnabled = hasLoopedSound && playbackEnabled;
             var loopedButton = GetSelectedSceneLoopedButton();
             var playbackKey = _selectedScene is not null && loopedButton is not null
                 ? SceneLoopPlaybackKey(_selectedScene.Id, loopedButton.Id)
@@ -3407,9 +3444,8 @@ public sealed partial class MainWindow : Window
         if (sceneButton is not null)
         {
             sound = PickSound(sceneButton.SoundId);
-            displayName = string.IsNullOrWhiteSpace(sceneButton.LocalName)
-                ? sound?.DisplayName ?? "Missing SoundBoard sound"
-                : sceneButton.LocalName!.Trim();
+            // Looped sound has no scene-local alias. Keep the visible name synchronized with SoundBoard.
+            displayName = sound?.DisplayName ?? "Missing SoundBoard sound";
             opacity = 1.0;
             if (_selectedScene is not null)
             {
@@ -3530,7 +3566,8 @@ public sealed partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Center,
             Padding = new Thickness(0),
-            Margin = new Thickness(0, -3, 0, -3)
+            Margin = new Thickness(0, -3, 0, -3),
+            IsEnabled = IsSelectedSceneActiveForPlayback()
         };
         Grid.SetRow(slider, 0);
         timelineGrid.Children.Add(slider);
@@ -3628,6 +3665,7 @@ public sealed partial class MainWindow : Window
             binding.CurrentText.Text = FormatDuration(status.IsActive ? status.CurrentSeconds : 0);
             binding.TotalText.Text = FormatDuration(duration);
             binding.Slider.Opacity = status.IsActive ? 1.0 : 0.52;
+            binding.Slider.IsEnabled = IsSelectedSceneActiveForPlayback();
             if (binding.PlayPauseButton is not null)
             {
                 binding.PlayPauseButton.Content = status.IsActive && !status.IsPaused ? "\uE769" : "\uE768";
@@ -3640,6 +3678,11 @@ public sealed partial class MainWindow : Window
     private void OnSceneTimelinePlayPauseClick(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: string playbackKey })
+        {
+            return;
+        }
+
+        if (!RequireSceneActiveForPlayback(_selectedScene, "control scene sound playback"))
         {
             return;
         }
@@ -3855,8 +3898,8 @@ public sealed partial class MainWindow : Window
         {
             SoundId = sound.Id,
             LocalName = sound.DisplayName,
-            VirtualMicVolume = _selectedScene.SceneButtonsVirtualMicVolume,
-            HeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume,
+            VirtualMicVolume = 1.0,
+            HeadphonesVolume = 1.0,
             IsLooped = false,
             SortOrder = nextOrder
         });
@@ -3954,7 +3997,10 @@ public sealed partial class MainWindow : Window
         stop.Click += (_, _) =>
         {
             flyout.Hide();
-            StopSceneSoundButton(context.Scene, context.Button);
+            if (RequireSceneActiveForPlayback(context.Scene, "stop scene sounds"))
+            {
+                StopSceneSoundButton(context.Scene, context.Button);
+            }
         };
 
         var delete = makeAction("Delete", 2, 0, 2);
@@ -4080,6 +4126,11 @@ public sealed partial class MainWindow : Window
         if (context.Sound is null)
         {
             AppendLog($"Scene sound button target is missing: {context.DisplayName}");
+            return;
+        }
+
+        if (!RequireSceneActiveForPlayback(context.Scene, "play scene sounds"))
+        {
             return;
         }
 
@@ -4406,6 +4457,11 @@ public sealed partial class MainWindow : Window
 
     private void OnSceneLoopPlayLoopClick(object sender, RoutedEventArgs e)
     {
+        if (!RequireSceneActiveForPlayback(_selectedScene, "play the looped sound"))
+        {
+            return;
+        }
+
         PlaySceneLoopedSound(loop: true);
     }
 
@@ -4413,6 +4469,11 @@ public sealed partial class MainWindow : Window
     {
         var loopedButton = GetSelectedSceneLoopedButton();
         if (_selectedScene is null || loopedButton is null)
+        {
+            return;
+        }
+
+        if (!RequireSceneActiveForPlayback(_selectedScene, "pause or resume the looped sound"))
         {
             return;
         }
@@ -4469,9 +4530,9 @@ public sealed partial class MainWindow : Window
             _selectedScene.SoundButtons.Add(new SceneSoundButton
             {
                 SoundId = sound.Id,
-                LocalName = sound.DisplayName,
-                VirtualMicVolume = _selectedScene.SceneButtonsVirtualMicVolume,
-                HeadphonesVolume = _selectedScene.SceneButtonsHeadphonesVolume,
+                LocalName = null,
+                VirtualMicVolume = 1.0,
+                HeadphonesVolume = 1.0,
                 IsLooped = true,
                 SortOrder = nextOrder
             });
@@ -4480,7 +4541,7 @@ public sealed partial class MainWindow : Window
         {
             StopSceneSoundButton(_selectedScene, loopedButton);
             loopedButton.SoundId = sound.Id;
-            loopedButton.LocalName = sound.DisplayName;
+            loopedButton.LocalName = null;
         }
 
         EnforceSingleLoopedSceneSound(_selectedScene);
@@ -4505,6 +4566,11 @@ public sealed partial class MainWindow : Window
 
         if (_selectedScene is not null)
         {
+            if (!RequireSceneActiveForPlayback(_selectedScene, "play the looped sound"))
+            {
+                return;
+            }
+
             PlaySceneSound(_selectedScene, loopedButton, sound, loop, "Scene looped sound");
             RefreshSceneLoopActionButtons();
         }
