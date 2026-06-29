@@ -1,20 +1,16 @@
-# VoiSe Version 8.1.6 Installer RC1
+# VoiSe Version 8.2.0 Installer RC2
 
-This is the first installer-ready package for the VoiSe first release.
-
-Main app state is based on Gate 8.1 buildfix 6, plus installer packaging files.
-
-## Build installer
+This archive is ready for building the VoiSe installer.
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\build-installer.ps1
 ```
 
-Outputs are created in:
+Expected installer output:
 
 ```text
-artifacts\installer\
+artifacts\installer\VoiSe-Setup-8.2.0-x64.exe
 ```
 
-See `docs/VoiSe_INSTALLER_RC1.md` for details.
+The installer package excludes user-created runtime data: categories, sound library JSON, copied sound files, voice presets, scenes, and settings. Those files live under `%LOCALAPPDATA%\VoiSe` on each user's PC and are not installed for other users.

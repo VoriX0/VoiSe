@@ -1,1 +1,1 @@
-Version 8.1.6 installer rc1
+Version 8.2.0 installer rc2

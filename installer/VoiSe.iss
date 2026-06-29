@@ -2,7 +2,7 @@
 ; Build with Inno Setup 6 using scripts\build-installer.ps1
 
 #define MyAppName "VoiSe"
-#define MyAppVersion "8.1.6"
+#define MyAppVersion "8.2.0"
 #define MyAppPublisher "VoriX"
 #define MyAppURL "https://github.com/VoriX0/VoiSe"
 #define MyAppExeName "VoiSe.App.exe"
@@ -43,7 +43,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "..\artifacts\publish\VoiSe\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\artifacts\publish\VoiSe\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "settings.json,soundboard.json,voice-presets.json,data\*,sounds\*,presets\*,scenes\*,*.user,*.suo"
 
 [Icons]
 Name: "{autoprograms}\VoiSe"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\Assets\AppIcon.ico"
@@ -53,4 +53,5 @@ Name: "{autodesktop}\VoiSe"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{ap
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch VoiSe"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; Keep user settings and sound library data in AppData by default.
+; Keep user settings and sound library data in %LOCALAPPDATA%\VoiSe by default.
+; The installer must not install developer/user categories, presets, scenes, or sounds.

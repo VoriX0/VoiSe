@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <UseWinUI>true</UseWinUI>
@@ -13,7 +13,17 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Version>8.2.0</Version>
+    <AssemblyVersion>8.2.0.0</AssemblyVersion>
+    <FileVersion>8.2.0.0</FileVersion>
+    <InformationalVersion>8.2.0</InformationalVersion>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- User-generated data must never be published or packed into the installer.
+         Runtime data is stored under %LOCALAPPDATA%\VoiSe on each user's PC. -->
+    <None Remove="data\**;sounds\**;presets\**;scenes\**;settings.json;soundboard.json;voice-presets.json" />
+    <Content Remove="data\**;sounds\**;presets\**;scenes\**;settings.json;soundboard.json;voice-presets.json" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.*" />
   </ItemGroup>
