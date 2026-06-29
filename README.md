@@ -1,10 +1,9 @@
-# VoiSe Gate 8.1 buildfix 4
+# VoiSe Gate 8.1 buildfix 5
 
-Branding polish over Gate 8.1 buildfix 3.
+Branding polish over Gate 8.1 buildfix 4.
 
 Included:
-- application icon from provided logo
-- transparent-corner logo asset generation
-- custom title bar icon
-- `Gate` wording updated to `Version`
-- subtitle removed from main header
+- regenerated high-quality app icon assets from original logo
+- refreshed executable/window icon
+- logo added before the main title in the app header
+- version text updated to `VoiSe Version 8.1.5`
