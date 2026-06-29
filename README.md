@@ -1,16 +1,11 @@
-# VoiSe Version 8.2.0 Installer RC2
+# VoiSe 8.2.0 installer-ready buildfix 1
 
-This archive is ready for building the VoiSe installer.
+Installer-ready source archive for VoiSe Version 8.2.0.
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\build-installer.ps1
-```
-
-Expected installer output:
-
-```text
-artifacts\installer\VoiSe-Setup-8.2.0-x64.exe
-```
-
-The installer package excludes user-created runtime data: categories, sound library JSON, copied sound files, voice presets, scenes, and settings. Those files live under `%LOCALAPPDATA%\VoiSe` on each user's PC and are not installed for other users.
+Included buildfixes:
+- dark theme enforcement on other PCs
+- VB-CABLE required notice and download link
+- audio engine auto-start blocked until VB-CABLE is detected
+- ordinary speakers no longer auto-selected as virtual output fallback
+- user data excluded from installer output
+- WinExe output to avoid console window

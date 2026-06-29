@@ -92,6 +92,7 @@ public sealed partial class MainWindow : Window
     private const double SceneLoopIconHeight = 42.0;
     private const string DefaultVoicePresetIcon = "\uE720";
     private const double SoundBoardWheelPixelsPerNotch = 56.0;
+    private const string VBCableDownloadUrl = "https://vb-audio.com/Cable/";
     private readonly Dictionary<string, SceneTimelineBinding> _sceneTimelineBindings = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, double> _soundDurationSecondsCache = new(StringComparer.OrdinalIgnoreCase);
     private bool _loadingSceneUi;
@@ -247,6 +248,62 @@ public sealed partial class MainWindow : Window
         else
         {
             AppendLog("Engine auto-start skipped. Check selected audio devices in Settings, then use manual Start Engine if needed.");
+        }
+    }
+
+    private static bool IsLikelyVBCableDevice(AudioDeviceInfo? device)
+    {
+        if (device is null || string.IsNullOrWhiteSpace(device.FriendlyName))
+        {
+            return false;
+        }
+
+        var name = device.FriendlyName;
+        return name.Contains("CABLE Input", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("VB-CABLE", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("VB Audio", StringComparison.OrdinalIgnoreCase)
+            || name.Contains("VB-Audio", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static AudioDeviceInfo? FindDetectedVBCableRenderDevice(IEnumerable<AudioDeviceInfo> renderDevices)
+    {
+        return renderDevices.FirstOrDefault(IsLikelyVBCableDevice);
+    }
+
+    private bool IsVBCableReady()
+    {
+        return IsLikelyVBCableDevice(VirtualOutputComboBox?.SelectedItem as AudioDeviceInfo);
+    }
+
+    private void UpdateVBCableUiState()
+    {
+        var virtualOutput = VirtualOutputComboBox?.SelectedItem as AudioDeviceInfo;
+        var hasCable = IsLikelyVBCableDevice(virtualOutput);
+
+        if (VBCableNoticeBorder is not null)
+        {
+            VBCableNoticeBorder.Visibility = hasCable ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        if (VBCableStatusTextBlock is not null)
+        {
+            VBCableStatusTextBlock.Text = hasCable
+                ? "VB-CABLE detected. Audio engine can be started."
+                : "VB-CABLE was not detected. Install VB-CABLE and click Refresh Devices. The audio engine will stay disabled until CABLE Input is available.";
+        }
+
+        if (StartEngineButton is not null)
+        {
+            StartEngineButton.IsEnabled = hasCable;
+        }
+
+        if (!hasCable && _engine is null && EngineStatusTextBlock is not null)
+        {
+            EngineStatusTextBlock.Text = "VB-CABLE required";
+        }
+        else if (hasCable && _engine is null && EngineStatusTextBlock is not null)
+        {
+            EngineStatusTextBlock.Text = "Stopped";
         }
     }
 
@@ -1825,11 +1882,18 @@ public sealed partial class MainWindow : Window
             ?? PickByName(captureDevices, "Fifine")
             ?? captureDevices.FirstOrDefault();
 
+        var detectedVBCable = FindDetectedVBCableRenderDevice(renderDevices);
+
         var selectedVirtual = PickById(renderDevices, oldVirtualId)
             ?? PickByExactName(renderDevices, _settings.VirtualOutputDeviceName)
             ?? PickByName(renderDevices, _settings.VirtualOutputDeviceName)
             ?? PickByName(renderDevices, "CABLE Input")
-            ?? renderDevices.FirstOrDefault();
+            ?? detectedVBCable;
+
+        if (!IsLikelyVBCableDevice(selectedVirtual))
+        {
+            selectedVirtual = detectedVBCable;
+        }
 
         var selectedMonitor = PickById(renderDevices, oldMonitorId)
             ?? PickByExactName(renderDevices, _settings.MonitorOutputDeviceName)
@@ -1845,6 +1909,7 @@ public sealed partial class MainWindow : Window
         AppendLog($"Selected input: {selectedInput?.FriendlyName ?? "none"}");
         AppendLog($"Selected virtual output: {selectedVirtual?.FriendlyName ?? "none"}");
         AppendLog($"Selected monitor: {selectedMonitor?.FriendlyName ?? "none"}");
+        UpdateVBCableUiState();
 
         if (saveAfterRefresh && !_loadingSettings)
         {
@@ -2548,6 +2613,14 @@ public sealed partial class MainWindow : Window
         if (inputInfo is null || virtualInfo is null)
         {
             AppendLog("Select input microphone and virtual output first.");
+            UpdateVBCableUiState();
+            return false;
+        }
+
+        if (!IsLikelyVBCableDevice(virtualInfo))
+        {
+            AppendLog("VB-CABLE was not detected. Install VB-CABLE and select CABLE Input before starting the engine.");
+            UpdateVBCableUiState();
             return false;
         }
 
@@ -2600,6 +2673,7 @@ public sealed partial class MainWindow : Window
         {
             _engine = null;
             EngineStatusTextBlock.Text = "Stopped";
+            UpdateVBCableUiState();
         }
     }
 
@@ -2880,6 +2954,7 @@ public sealed partial class MainWindow : Window
     private void OnRouteSettingChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshingDevices || _loadingSettings) return;
+        UpdateVBCableUiState();
         SaveCurrentSettings();
         ScheduleEngineRestart("audio route changed");
     }

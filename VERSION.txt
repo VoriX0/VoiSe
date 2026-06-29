@@ -1,1 +1,1 @@
-Version 8.2.0 installer rc2
+VoiSe Version 8.2.0

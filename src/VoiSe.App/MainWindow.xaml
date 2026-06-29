@@ -6,9 +6,10 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
+    RequestedTheme="Dark"
     Title="VoiSe Version 8.2.0">
 
-    <Grid x:Name="RootGrid" Background="#000000">
+    <Grid x:Name="RootGrid" RequestedTheme="Dark" Background="#000000">
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
             <RowDefinition Height="*" />
@@ -39,18 +40,18 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                     <Image Source="ms-appx:///Assets/AppIcon_48.png" Width="34" Height="34" VerticalAlignment="Center" />
-                    <TextBlock Text="VoiSe Version 8.2.0" FontSize="28" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Text="VoiSe Version 8.2.0" FontSize="28" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
-                    <TextBlock Text="Engine" HorizontalAlignment="Right" Opacity="0.62" />
-                    <TextBlock x:Name="EngineStatusTextBlock" Text="Stopped" HorizontalAlignment="Right" Opacity="0.9" FontWeight="SemiBold" />
+                    <TextBlock Text="Engine" HorizontalAlignment="Right" Foreground="White" Opacity="0.62" />
+                    <TextBlock x:Name="EngineStatusTextBlock" Text="Stopped" HorizontalAlignment="Right" Foreground="White" Opacity="0.9" FontWeight="SemiBold" />
                 </StackPanel>
             </Grid>
         </Border>
 
         <Grid Grid.Row="1" x:Name="MainContentHost">
             <Border Padding="4">
-                <TabView x:Name="MainTabView" IsAddTabButtonVisible="False" TabWidthMode="Equal">
+                <TabView x:Name="MainTabView" IsAddTabButtonVisible="False" TabWidthMode="Equal" RequestedTheme="Dark">
                 <TabViewItem Header="SoundBoard" IsClosable="False">
                     <Grid x:Name="SoundBoardTabRoot" Background="Transparent" Padding="0,16,0,0" RowSpacing="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" AllowDrop="True" DragOver="OnSoundBoardDragOver" DragLeave="OnSoundBoardDragLeave" Drop="OnSoundBoardDrop">
                         <Grid.RowDefinitions>
@@ -651,6 +652,17 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" Spacing="18">
+                                <Border x:Name="VBCableNoticeBorder" Background="#22141414" BorderBrush="#55D68B00" BorderThickness="1" CornerRadius="12" Padding="14" Visibility="Collapsed">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="VB-CABLE required" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock x:Name="VBCableStatusTextBlock" Text="VB-CABLE was not detected. Install VB-CABLE and click Refresh Devices. The audio engine will stay disabled until CABLE Input is available." TextWrapping="WrapWholeWords" Opacity="0.92" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <HyperlinkButton Content="Open VB-CABLE download page" NavigateUri="https://vb-audio.com/Cable/" HorizontalAlignment="Left" />
+                                            <Button Content="Refresh Devices" Click="OnRefreshDevicesClick" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <TextBlock Text="Audio devices" FontSize="18" FontWeight="SemiBold" />
 
                                 <Grid Width="640" HorizontalAlignment="Left" ColumnSpacing="18">
@@ -704,8 +716,8 @@
                                 <StackPanel Spacing="8">
                                     <TextBlock Text="The engine starts automatically when VoiSe opens. Use these buttons only for manual troubleshooting." Opacity="0.7" TextWrapping="Wrap" />
                                     <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <Button Content="Start Engine" MinWidth="154" Height="42" Padding="18,8" Click="OnStartEngineClick" />
-                                        <Button Content="Stop Engine" MinWidth="154" Height="42" Padding="18,8" Click="OnStopEngineClick" />
+                                        <Button x:Name="StartEngineButton" Content="Start Engine" MinWidth="154" Height="42" Padding="18,8" Click="OnStartEngineClick" />
+                                        <Button x:Name="StopEngineButton" Content="Stop Engine" MinWidth="154" Height="42" Padding="18,8" Click="OnStopEngineClick" />
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
