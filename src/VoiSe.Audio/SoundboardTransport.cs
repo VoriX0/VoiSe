@@ -189,6 +189,24 @@ public sealed class SoundboardTransport
         }
     }
 
+
+    public void UpdateLoop(bool loop, string? playbackKey = null)
+    {
+        lock (_sync)
+        {
+            if (string.IsNullOrWhiteSpace(playbackKey))
+            {
+                _primary?.SetLoop(loop);
+                return;
+            }
+
+            foreach (var target in FindByKey(playbackKey))
+            {
+                target.SetLoop(loop);
+            }
+        }
+    }
+
     public SoundboardStatus GetStatus(string? playbackKey = null)
     {
         lock (_sync)
@@ -320,7 +338,7 @@ public sealed class SoundboardTransport
             PlaybackKey = playbackKey;
         }
 
-        public bool IsLoop { get; }
+        public bool IsLoop { get; private set; }
         public string? PlaybackKey { get; }
         public bool IsFinished => _samples.Length == 0 || (!IsLoop && _virtualFinished && _monitorFinished);
         public bool IsPaused { get; private set; }
@@ -328,6 +346,11 @@ public sealed class SoundboardTransport
         public void SetPaused(bool paused)
         {
             IsPaused = paused;
+        }
+
+        public void SetLoop(bool loop)
+        {
+            IsLoop = loop;
         }
 
         public void UpdateVolumes(float virtualVolume, float monitorVolume)

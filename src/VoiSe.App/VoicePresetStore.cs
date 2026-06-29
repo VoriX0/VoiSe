@@ -17,7 +17,7 @@ public sealed class VoicePresetStore
 {
   "SchemaVersion": 1,
   "Name": "Default",
-  "Icon": "\uD83C\uDF99\uFE0F",
+  "Icon": "\uE720",
   "Sliders": {
     "VoiceGain": 0,
     "Gate": -100,
@@ -62,6 +62,7 @@ public sealed class VoicePresetStore
                     continue;
                 }
 
+                preset.Icon = string.IsNullOrWhiteSpace(preset.Icon) ? "\uE720" : preset.Icon;
                 preset.Sliders ??= new Dictionary<string, double>();
                 preset.FilePath = file;
                 presets.Add(preset);
@@ -103,7 +104,7 @@ public sealed class VoicePresetStore
         }
 
         preset.SchemaVersion = Math.Max(1, preset.SchemaVersion);
-        preset.Icon = string.IsNullOrWhiteSpace(preset.Icon) ? "🎙️" : preset.Icon;
+        preset.Icon = string.IsNullOrWhiteSpace(preset.Icon) ? "\uE720" : preset.Icon;
         preset.Sliders ??= new Dictionary<string, double>();
         preset.FilePath = GetAvailablePresetPath(preset.Name);
         File.WriteAllText(preset.FilePath, JsonSerializer.Serialize(preset, JsonOptions));

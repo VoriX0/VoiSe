@@ -83,9 +83,12 @@ public sealed partial class MainWindow : Window
     private const double SceneSoundButtonWidth = 252.0;
     private const double SceneSoundButtonHeight = 112.0;
     private const double SceneLoopIconHeight = 42.0;
+    private const string DefaultVoicePresetIcon = "\uE720";
+    private const double SoundBoardWheelPixelsPerNotch = 72.0;
     private readonly Dictionary<string, SceneTimelineBinding> _sceneTimelineBindings = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, double> _soundDurationSecondsCache = new(StringComparer.OrdinalIgnoreCase);
     private bool _loadingSceneUi;
+    private bool _soundBoardLoopEnabled;
 
     public MainWindow()
     {
@@ -97,6 +100,7 @@ public sealed partial class MainWindow : Window
         _library = _libraryStore.Load();
         InitializeComponent();
         _windowHandle = WindowNative.GetWindowHandle(this);
+        ConfigureTitleBar();
         MainTabView.SelectionChanged += OnMainTabSelectionChanged;
         SoundInputOverlay.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler(OnSoundInputOverlayPointerWheelChanged), true);
         InstallSoundBoardWheelHook();
@@ -123,9 +127,40 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 7.8 UI started.");
+        AppendLog("Gate 8 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
+    }
+
+
+    private void ConfigureTitleBar()
+    {
+        try
+        {
+            var titleBar = AppWindow.TitleBar;
+            var black = Microsoft.UI.ColorHelper.FromArgb(0xFF, 0x00, 0x00, 0x00);
+            var darkHover = Microsoft.UI.ColorHelper.FromArgb(0xFF, 0x20, 0x20, 0x20);
+            var darkPressed = Microsoft.UI.ColorHelper.FromArgb(0xFF, 0x10, 0x10, 0x10);
+            var white = Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            var muted = Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xDD, 0xDD, 0xDD);
+
+            titleBar.BackgroundColor = black;
+            titleBar.ForegroundColor = white;
+            titleBar.InactiveBackgroundColor = black;
+            titleBar.InactiveForegroundColor = muted;
+            titleBar.ButtonBackgroundColor = black;
+            titleBar.ButtonForegroundColor = white;
+            titleBar.ButtonHoverBackgroundColor = darkHover;
+            titleBar.ButtonHoverForegroundColor = white;
+            titleBar.ButtonPressedBackgroundColor = darkPressed;
+            titleBar.ButtonPressedForegroundColor = white;
+            titleBar.ButtonInactiveBackgroundColor = black;
+            titleBar.ButtonInactiveForegroundColor = muted;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Title bar color setup skipped: {ex.Message}");
+        }
     }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
@@ -168,6 +203,26 @@ public sealed partial class MainWindow : Window
             _loadingSettings = false;
             UpdateAllLabels();
             UpdateTransportHotkeySummary();
+            AutoStartEngineAfterRestore();
+        }
+    }
+
+
+    private void AutoStartEngineAfterRestore()
+    {
+        if (_engine is not null)
+        {
+            return;
+        }
+
+        _manualStopRequested = false;
+        if (StartEngine(logAlreadyRunning: false))
+        {
+            AppendLog("Engine auto-started on application launch.");
+        }
+        else
+        {
+            AppendLog("Engine auto-start skipped. Check selected audio devices in Settings, then use manual Start Engine if needed.");
         }
     }
 
@@ -607,7 +662,7 @@ public sealed partial class MainWindow : Window
     private bool TryScrollSoundOverlay(int wheelDelta)
     {
         // Smaller step than the native 120px-style jumps: about one row per wheel notch.
-        return TryScrollViewer(SoundOverlayScrollViewer, wheelDelta, 14.0);
+        return TryScrollViewer(SoundOverlayScrollViewer, wheelDelta, SoundBoardWheelPixelsPerNotch);
     }
 
     private bool TryHandleGlobalHotkey(int vkCode, bool isKeyDown, bool isKeyUp)
@@ -1907,6 +1962,91 @@ public sealed partial class MainWindow : Window
         }
     }
 
+
+    private static bool IsSupportedSoundFile(string path)
+    {
+        var extension = System.IO.Path.GetExtension(path);
+        return extension.Equals(".wav", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".ogg", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnSoundBoardDragOver(object sender, DragEventArgs e)
+    {
+        if (e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+            if (SoundBoardDropOverlay is not null && !IsSceneActive)
+            {
+                SoundBoardDropOverlay.Visibility = Visibility.Visible;
+            }
+        }
+        else
+        {
+            e.AcceptedOperation = DataPackageOperation.None;
+        }
+    }
+
+    private void OnSoundBoardDragLeave(object sender, DragEventArgs e)
+    {
+        if (SoundBoardDropOverlay is not null)
+        {
+            SoundBoardDropOverlay.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private async void OnSoundBoardDrop(object sender, DragEventArgs e)
+    {
+        if (SoundBoardDropOverlay is not null)
+        {
+            SoundBoardDropOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        var category = CurrentCategory ?? _library.Categories.OrderBy(c => c.SortOrder).FirstOrDefault();
+        if (category is null)
+        {
+            AppendLog("Create a category before dropping sounds.");
+            return;
+        }
+
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        try
+        {
+            var items = await e.DataView.GetStorageItemsAsync();
+            var added = 0;
+            SoundBoardSound? lastSound = null;
+            foreach (var item in items)
+            {
+                if (item is not Windows.Storage.StorageFile file || string.IsNullOrWhiteSpace(file.Path) || !IsSupportedSoundFile(file.Path))
+                {
+                    continue;
+                }
+
+                lastSound = _libraryStore.AddSound(_library, file.Path, category);
+                added++;
+            }
+
+            if (added == 0)
+            {
+                AppendLog("No supported sound files were dropped. Supported: wav, mp3, ogg.");
+                return;
+            }
+
+            _settings.LastSoundCategoryId = category.Id;
+            RefreshSoundList();
+            SelectSound(lastSound);
+            AppendLog($"Dropped {added} track(s) into {category.Name}.");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"Drop sound files error: {ex.Message}");
+        }
+    }
+
     private async Task<string?> PickSoundFileAsync()
     {
         var picker = new FileOpenPicker();
@@ -1956,12 +2096,30 @@ public sealed partial class MainWindow : Window
         AppendLog($"Category renamed: {name}");
     }
 
-    private void OnDeleteCategoryClick(object sender, RoutedEventArgs e)
+    private async void OnDeleteCategoryClick(object sender, RoutedEventArgs e)
     {
         var category = CurrentCategory;
         if (category is null)
         {
             AppendLog("Select a category to delete.");
+            return;
+        }
+
+        var soundCount = _library.Sounds.Count(sound => sound.CategoryId == category.Id);
+        var dialog = new ContentDialog
+        {
+            Title = "Delete category",
+            Content = $"Delete category '{category.Name}' and {soundCount} track(s)? Sound files stored in the VoiSe library folder will be removed. This cannot be undone.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = ((FrameworkElement)Content).XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary)
+        {
+            AppendLog($"Category delete cancelled: {category.Name}");
             return;
         }
 
@@ -2358,6 +2516,20 @@ public sealed partial class MainWindow : Window
             : center + (normalized / 100.0) * (max - center);
     }
 
+
+    private void OnSoundLoopToggleChanged(object sender, RoutedEventArgs e)
+    {
+        _soundBoardLoopEnabled = SoundLoopToggleButton?.IsChecked == true;
+        if (!IsSceneActive)
+        {
+            _engine?.UpdateSoundLoop(_soundBoardLoopEnabled);
+        }
+
+        AppendLog(_soundBoardLoopEnabled
+            ? "SoundBoard loop enabled for the current track."
+            : "SoundBoard loop disabled.");
+    }
+
     private void OnPlaySoundClick(object sender, RoutedEventArgs e)
     {
         if (BlockSoundBoardPlaybackIfSceneActive()) return;
@@ -2382,6 +2554,7 @@ public sealed partial class MainWindow : Window
     private void PlaySelectedSound(bool loop = false)
     {
         if (BlockSoundBoardPlaybackIfSceneActive()) return;
+        loop = loop || _soundBoardLoopEnabled;
         var soundPath = _selectedSound?.FilePath ?? _soundFilePath;
         var displayName = _selectedSound?.DisplayName ?? (string.IsNullOrWhiteSpace(soundPath) ? "Sound" : System.IO.Path.GetFileName(soundPath));
         PlaySoundPath(
@@ -4723,6 +4896,128 @@ public sealed partial class MainWindow : Window
         VoicePresetsPanel.Children.Add(CreateVoicePresetToolsTile());
     }
 
+
+    private static readonly VoicePresetIconChoice[] VoicePresetIconChoices =
+    {
+        new("Microphone", "\uE720", true),
+        new("Voice", "\uE8D6", true),
+        new("Speaker", "\uE767", true),
+        new("Music", "\uE8D6", true),
+        new("Radio", "\uE789", true),
+        new("Robot", "\uE99A", true),
+        new("Alien", "👽", false),
+        new("Monster", "👾", false),
+        new("Fire", "🔥", false),
+        new("Snow", "❄️", false),
+        new("Storm", "⚡", false),
+        new("Star", "⭐", false)
+    };
+
+    private static string NormalizeVoicePresetIcon(string? icon)
+    {
+        return string.IsNullOrWhiteSpace(icon) ? DefaultVoicePresetIcon : icon.Trim();
+    }
+
+    private static bool IsMdl2VoicePresetIcon(string? icon)
+    {
+        if (string.IsNullOrWhiteSpace(icon))
+        {
+            return true;
+        }
+
+        return VoicePresetIconChoices.Any(choice => choice.UseMdl2 && string.Equals(choice.Icon, icon, StringComparison.Ordinal));
+    }
+
+    private TextBlock CreateVoicePresetIconTextBlock(string? icon, double fontSize)
+    {
+        var normalized = NormalizeVoicePresetIcon(icon);
+        return new TextBlock
+        {
+            Text = normalized,
+            FontFamily = new FontFamily(IsMdl2VoicePresetIcon(normalized) ? "Segoe MDL2 Assets" : "Segoe UI Emoji"),
+            FontSize = fontSize,
+            Foreground = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Center
+        };
+    }
+
+    private async Task<(string Name, string Icon)?> ShowVoicePresetNameAndIconDialogAsync(string title, string initialName, string? initialIcon)
+    {
+        var selectedIcon = NormalizeVoicePresetIcon(initialIcon);
+        var nameBox = new TextBox
+        {
+            PlaceholderText = "Preset name",
+            Text = initialName,
+            MinWidth = 360
+        };
+
+        var iconGrid = new VariableSizedWrapGrid
+        {
+            Orientation = Orientation.Horizontal,
+            ItemWidth = 52,
+            ItemHeight = 52,
+            MaximumRowsOrColumns = 6
+        };
+
+        var buttons = new List<ToggleButton>();
+        foreach (var choice in VoicePresetIconChoices)
+        {
+            var button = new ToggleButton
+            {
+                Width = 44,
+                Height = 44,
+                MinWidth = 0,
+                Tag = choice.Icon,
+                Content = CreateVoicePresetIconTextBlock(choice.Icon, choice.UseMdl2 ? 20 : 22),
+                IsChecked = string.Equals(choice.Icon, selectedIcon, StringComparison.Ordinal)
+            };
+            ToolTipService.SetToolTip(button, choice.Name);
+            button.Checked += (_, _) =>
+            {
+                selectedIcon = (string)button.Tag;
+                foreach (var other in buttons.Where(other => !ReferenceEquals(other, button)))
+                {
+                    other.IsChecked = false;
+                }
+            };
+            buttons.Add(button);
+            iconGrid.Children.Add(button);
+        }
+
+        if (!buttons.Any(button => button.IsChecked == true) && buttons.Count > 0)
+        {
+            buttons[0].IsChecked = true;
+            selectedIcon = (string)buttons[0].Tag;
+        }
+
+        var panel = new StackPanel { Spacing = 12 };
+        panel.Children.Add(nameBox);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Icon",
+            Opacity = 0.78,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+        });
+        panel.Children.Add(iconGrid);
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            Content = panel,
+            PrimaryButtonText = "OK",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = ((FrameworkElement)Content).XamlRoot
+        };
+
+        var result = await dialog.ShowAsync();
+        return result == ContentDialogResult.Primary
+            ? (nameBox.Text.Trim(), selectedIcon)
+            : null;
+    }
+
     private FrameworkElement CreateVoicePresetTile(VoicePreset preset)
     {
         var stack = new StackPanel
@@ -4741,13 +5036,7 @@ public sealed partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Top,
             Tag = preset,
-            Content = new TextBlock
-            {
-                Text = string.IsNullOrWhiteSpace(preset.Icon) ? "🎙️" : preset.Icon,
-                FontSize = 30,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Content = CreateVoicePresetIconTextBlock(preset.Icon, 30)
         };
         button.Click += OnVoicePresetClick;
         button.ContextFlyout = CreateVoicePresetFlyout(preset);
@@ -4834,7 +5123,13 @@ public sealed partial class MainWindow : Window
 
     private async Task RenameVoicePresetAsync(VoicePreset preset)
     {
-        var newName = await ShowTextDialogAsync("Rename voice preset", "Preset name", preset.Name);
+        var edited = await ShowVoicePresetNameAndIconDialogAsync("Rename voice preset", preset.Name, preset.Icon);
+        if (edited is null)
+        {
+            return;
+        }
+
+        var (newName, newIcon) = edited.Value;
         if (string.IsNullOrWhiteSpace(newName))
         {
             return;
@@ -4843,6 +5138,8 @@ public sealed partial class MainWindow : Window
         try
         {
             _voicePresetStore.RenamePreset(preset, newName.Trim());
+            preset.Icon = NormalizeVoicePresetIcon(newIcon);
+            _voicePresetStore.OverwritePreset(preset);
             LoadVoicePresetsIntoUi();
             AppendLog($"Voice preset renamed: {preset.Name}");
         }
@@ -4857,7 +5154,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var recreated = CaptureCurrentVoicePreset(preset.Name);
-            recreated.Icon = string.IsNullOrWhiteSpace(preset.Icon) ? "🎙️" : preset.Icon;
+            recreated.Icon = NormalizeVoicePresetIcon(preset.Icon);
             recreated.PushToTalkHotkey = preset.PushToTalkHotkey;
             recreated.PresetHotkey = preset.PresetHotkey;
             recreated.FilePath = preset.FilePath;
@@ -5102,7 +5399,13 @@ public sealed partial class MainWindow : Window
 
     private async void OnNewVoicePresetClick(object sender, RoutedEventArgs e)
     {
-        var name = await ShowTextDialogAsync("New voice preset", "Preset name", "New Preset");
+        var edited = await ShowVoicePresetNameAndIconDialogAsync("New voice preset", "New Preset", DefaultVoicePresetIcon);
+        if (edited is null)
+        {
+            return;
+        }
+
+        var (name, icon) = edited.Value;
         if (string.IsNullOrWhiteSpace(name))
         {
             return;
@@ -5111,6 +5414,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var preset = CaptureCurrentVoicePreset(name.Trim());
+            preset.Icon = NormalizeVoicePresetIcon(icon);
             var path = _voicePresetStore.SavePreset(preset);
             LoadVoicePresetsIntoUi();
             AppendLog($"Voice preset saved: {preset.Name} -> {System.IO.Path.GetFileName(path)}");
@@ -5126,7 +5430,7 @@ public sealed partial class MainWindow : Window
         return new VoicePreset
         {
             Name = name,
-            Icon = "🎙️",
+            Icon = DefaultVoicePresetIcon,
             Sliders = new Dictionary<string, double>
             {
                 ["VoiceGain"] = GetVoiceValue(VoiceGainSlider, VoiceGainValueBox),
@@ -5453,4 +5757,5 @@ public sealed partial class MainWindow : Window
 
         _logBuffer.Append(line);
     }
+    private readonly record struct VoicePresetIconChoice(string Name, string Icon, bool UseMdl2);
 }

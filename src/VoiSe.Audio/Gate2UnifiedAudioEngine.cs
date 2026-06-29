@@ -132,6 +132,11 @@ public sealed class Gate2UnifiedAudioEngine : IDisposable
         _soundboard.UpdateVolumes(virtualVolume, monitorVolume, playbackKey);
     }
 
+    public void UpdateSoundLoop(bool loop, string? playbackKey = null)
+    {
+        _soundboard.UpdateLoop(loop, playbackKey);
+    }
+
     public void Stop()
     {
         _soundboard.Stop();
