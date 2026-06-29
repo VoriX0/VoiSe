@@ -1,8 +1,10 @@
-# VoiSe Gate 8.1 buildfix 2
+# VoiSe Gate 8.1 buildfix 4
 
-Point fix over Gate 8.1 buildfix 1.
+Branding polish over Gate 8.1 buildfix 3.
 
-- Logs scroll behavior is kept unchanged.
-- Voice Changer preset icon picker wheel zone now extends right by 50% instead of left.
-- Icon picker keeps the 100% downward wheel-zone extension.
-- Voice Changer page scroll remains blocked while icon picker is open.
+Included:
+- application icon from provided logo
+- transparent-corner logo asset generation
+- custom title bar icon
+- `Gate` wording updated to `Version`
+- subtitle removed from main header

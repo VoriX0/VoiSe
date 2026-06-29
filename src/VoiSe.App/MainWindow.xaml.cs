@@ -142,7 +142,7 @@ public sealed partial class MainWindow : Window
         _timelineTimer.Tick += OnTimelineTimerTick;
         _timelineTimer.Start();
 
-        AppendLog("Gate 8 UI started.");
+        AppendLog("VoiSe Version 8.1.4 UI started.");
         AppendLog($"Settings path: {_settingsStore.SettingsPath}");
         StartupLog.Write("MainWindow initialized; waiting for first activation.");
     }
@@ -174,6 +174,12 @@ public sealed partial class MainWindow : Window
             titleBar.ButtonPressedForegroundColor = white;
             titleBar.ButtonInactiveBackgroundColor = black;
             titleBar.ButtonInactiveForegroundColor = muted;
+
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+            if (File.Exists(iconPath))
+            {
+                AppWindow.SetIcon(iconPath);
+            }
         }
         catch (Exception ex)
         {

@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Title="VoiSe Gate 8 - Polish">
+    Title="VoiSe Version 8.1.4">
 
     <Grid x:Name="RootGrid" Background="#000000">
         <Grid.RowDefinitions>
@@ -20,10 +20,8 @@
                 <ColumnDefinition Width="138" />
             </Grid.ColumnDefinitions>
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="10,0,0,0">
-                <Border Width="16" Height="16" Background="#202020" BorderBrush="#66FFFFFF" BorderThickness="1">
-                    <TextBlock Text="V" FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <TextBlock Text="VoiSe Gate 8 - Polish" FontSize="12" Foreground="White" VerticalAlignment="Center" />
+                <Image Source="ms-appx:///Assets/AppIcon_32.png" Width="16" Height="16" VerticalAlignment="Center" />
+                <TextBlock Text="VoiSe Version 8.1.4" FontSize="12" Foreground="White" VerticalAlignment="Center" />
             </StackPanel>
         </Grid>
 
@@ -39,9 +37,8 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
-                    <TextBlock Text="VoiSe Gate 8" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Polish: auto engine, SoundBoard loop/drop, faster scrolling, category safety, and voice preset icons" Opacity="0.75" />
+                <StackPanel Grid.Column="0" Spacing="0" VerticalAlignment="Center">
+                    <TextBlock Text="VoiSe Version 8.1.4" FontSize="28" FontWeight="SemiBold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
                     <TextBlock Text="Engine" HorizontalAlignment="Right" Opacity="0.62" />
