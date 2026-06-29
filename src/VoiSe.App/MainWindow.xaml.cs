@@ -79,6 +79,7 @@ public sealed partial class MainWindow : Window
     private const double SoundWheelZoneExpandBottomRatio = 1.60;
     private const double SceneListWheelZoneExpandDownRatio = 0.65;
     private const double ModalWheelZoneExpandLeftRatio = 0.50;
+    private const double ModalWheelZoneExpandRightRatio = 0.50;
     private const double ModalWheelZoneExpandBottomRatio = 1.00;
     private const double VoiceValueMin = -9999.0;
     private const double VoiceValueMax = 9999.0;
@@ -96,6 +97,8 @@ public sealed partial class MainWindow : Window
     private bool _suppressMainTabWheelRouting;
     private ScrollViewer? _activeIconPickerScrollViewer;
     private FrameworkElement? _activeIconPickerWheelZoneElement;
+    private double _activeModalWheelZoneLeftExtensionRatio;
+    private double _activeModalWheelZoneRightExtensionRatio;
 
     public MainWindow()
     {
@@ -494,7 +497,7 @@ public sealed partial class MainWindow : Window
         return yDip >= top && yDip <= bottom;
     }
 
-    private bool IsPointInElementWheelZone(FrameworkElement? element, double xDip, double yDip, bool extendBottom, double bottomExtensionRatio = 0.0, double leftExtensionRatio = 0.0)
+    private bool IsPointInElementWheelZone(FrameworkElement? element, double xDip, double yDip, bool extendBottom, double bottomExtensionRatio = 0.0, double leftExtensionRatio = 0.0, double rightExtensionRatio = 0.0)
     {
         if (RootGrid is null || element is null)
         {
@@ -515,6 +518,11 @@ public sealed partial class MainWindow : Window
             if (leftExtensionRatio > 0.0)
             {
                 left -= width * leftExtensionRatio;
+            }
+
+            if (rightExtensionRatio > 0.0)
+            {
+                right += width * rightExtensionRatio;
             }
 
             if (bottomExtensionRatio > 0.0)
@@ -545,17 +553,18 @@ public sealed partial class MainWindow : Window
             return false;
         }
 
-        // Gate 8.1 buildfix 1: modal scroll pickers/logs own an enlarged wheel
-        // zone. The zone extends down and to the left, matching the Voice
-        // Changer preset icon picker calibration and preventing the parent page
-        // from stealing wheel input while the modal is open.
+        // Gate 8.1 buildfix 2: modal wheel zones are configurable per popup.
+        // Logs keep the left/down expansion from buildfix 1. The icon picker
+        // uses right/down expansion so the wheel works in the area where the
+        // picker visually opens without stealing the left side unnecessarily.
         return IsPointInElementWheelZone(
                 wheelZone,
                 xDip,
                 yDip,
                 extendBottom: false,
                 bottomExtensionRatio: ModalWheelZoneExpandBottomRatio,
-                leftExtensionRatio: ModalWheelZoneExpandLeftRatio)
+                leftExtensionRatio: _activeModalWheelZoneLeftExtensionRatio,
+                rightExtensionRatio: _activeModalWheelZoneRightExtensionRatio)
             && TryScrollViewer(scrollViewer, wheelDelta, 52.0);
     }
 
@@ -687,6 +696,8 @@ public sealed partial class MainWindow : Window
             _suppressMainTabWheelRouting = true;
             _activeIconPickerScrollViewer = scrollViewer;
             _activeIconPickerWheelZoneElement = scrollViewer;
+            _activeModalWheelZoneLeftExtensionRatio = ModalWheelZoneExpandLeftRatio;
+            _activeModalWheelZoneRightExtensionRatio = 0.0;
             try
             {
                 await dialog.ShowAsync();
@@ -695,6 +706,8 @@ public sealed partial class MainWindow : Window
             {
                 _activeIconPickerScrollViewer = null;
                 _activeIconPickerWheelZoneElement = null;
+                _activeModalWheelZoneLeftExtensionRatio = 0.0;
+                _activeModalWheelZoneRightExtensionRatio = 0.0;
                 _suppressMainTabWheelRouting = false;
             }
         }
@@ -5288,6 +5301,8 @@ public sealed partial class MainWindow : Window
         _suppressMainTabWheelRouting = true;
         _activeIconPickerScrollViewer = iconScrollViewer;
         _activeIconPickerWheelZoneElement = iconScrollViewer;
+        _activeModalWheelZoneLeftExtensionRatio = 0.0;
+        _activeModalWheelZoneRightExtensionRatio = ModalWheelZoneExpandRightRatio;
         try
         {
             result = await dialog.ShowAsync();
@@ -5296,6 +5311,8 @@ public sealed partial class MainWindow : Window
         {
             _activeIconPickerScrollViewer = null;
             _activeIconPickerWheelZoneElement = null;
+            _activeModalWheelZoneLeftExtensionRatio = 0.0;
+            _activeModalWheelZoneRightExtensionRatio = 0.0;
             _suppressMainTabWheelRouting = false;
         }
 
