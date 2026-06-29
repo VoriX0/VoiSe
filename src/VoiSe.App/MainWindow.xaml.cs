@@ -5041,6 +5041,21 @@ public sealed partial class MainWindow : Window
         };
     }
 
+    private static void AttachIconPickerWheelRouting(UIElement source, ScrollViewer targetScrollViewer)
+    {
+        source.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler((_, args) =>
+        {
+            var delta = args.GetCurrentPoint(targetScrollViewer).Properties.MouseWheelDelta;
+            if (delta == 0)
+            {
+                return;
+            }
+
+            TryScrollViewer(targetScrollViewer, delta, 52.0);
+            args.Handled = true;
+        }), true);
+    }
+
     private async Task<(string Name, string Icon)?> ShowVoicePresetNameAndIconDialogAsync(string title, string initialName, string? initialIcon)
     {
         var selectedIcon = NormalizeVoicePresetIcon(initialIcon);
@@ -5065,9 +5080,10 @@ public sealed partial class MainWindow : Window
         {
             var button = new ToggleButton
             {
-                Width = 44,
-                Height = 44,
+                Width = 52,
+                Height = 52,
                 MinWidth = 0,
+                Padding = new Thickness(0),
                 Tag = choice.Icon,
                 Content = CreateVoicePresetIconTextBlock(choice.Icon, choice.UseMdl2 ? 20 : 22),
                 IsChecked = string.Equals(choice.Icon, selectedIcon, StringComparison.Ordinal)
@@ -5103,21 +5119,31 @@ public sealed partial class MainWindow : Window
         {
             Content = iconGrid,
             MaxHeight = 260,
+            MinWidth = 416,
+            Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x00, 0x00, 0x00, 0x00)),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollMode = ScrollMode.Enabled,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             HorizontalScrollMode = ScrollMode.Disabled,
             ZoomMode = ZoomMode.Disabled
         };
-        iconScrollViewer.AddHandler(UIElement.PointerWheelChangedEvent, new PointerEventHandler((_, args) =>
+
+        var iconWheelHost = new Border
         {
-            var delta = args.GetCurrentPoint(iconScrollViewer).Properties.MouseWheelDelta;
-            if (TryScrollViewer(iconScrollViewer, delta, 52.0))
-            {
-                args.Handled = true;
-            }
-        }), true);
-        panel.Children.Add(iconScrollViewer);
+            Child = iconScrollViewer,
+            MinWidth = 416,
+            MaxHeight = 260,
+            Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x00, 0x00, 0x00, 0x00))
+        };
+
+        AttachIconPickerWheelRouting(iconWheelHost, iconScrollViewer);
+        AttachIconPickerWheelRouting(iconScrollViewer, iconScrollViewer);
+        foreach (var button in buttons)
+        {
+            AttachIconPickerWheelRouting(button, iconScrollViewer);
+        }
+
+        panel.Children.Add(iconWheelHost);
 
         var dialog = new ContentDialog
         {
