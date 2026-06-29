@@ -1,8 +1,9 @@
-# VoiSe 8.2.0 installer-ready buildfix 1
+# VoiSe 8.2.0 installer-ready buildfix 2
 
 Installer-ready source archive for VoiSe Version 8.2.0.
 
-Included buildfixes:
+Included:
+- build fix for WinUI XAML compiler error in buildfix 1
 - dark theme enforcement on other PCs
 - VB-CABLE required notice and download link
 - audio engine auto-start blocked until VB-CABLE is detected
